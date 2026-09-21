@@ -1,0 +1,18 @@
+# dependencies
+node_modules/
+
+# vercel
+.vercel/
+
+# os / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+
+# local scratch
+scratch/
+*.log
+
+# Claude Code local overrides (machine-specific)
+.claude/settings.local.json
