@@ -13,6 +13,8 @@ js/fees.js          swap fee per DEX, and how much of it the LP actually keeps
 js/api.js           GeckoTerminal + DexScreener clients, pool resolution
 js/analyze.js       the analysis engine
 js/backtest.js      range replay against real daily bars
+js/swap.js          constant-product curve maths: quotes, slippage, entry/exit cost
+js/execution.js     the "getting in and out" panel
 js/model.js         one closed-form model of a position, built to be perturbed
 js/formulas.js      the formula catalogue, with live numbers substituted in
 js/whatif.js        sensitivity panel + formulas panel
@@ -66,6 +68,53 @@ pool's quoted fee rate, you earn a share of it, and your own deposit sits in the
 `share = E·Q / (R + E·Q)`. On a large pool that term is invisible; on a small one it dominates
 everything else on the page.
 
+## Getting in and out
+
+Every other panel reasons from aggregate TVL and volume, and quietly assumes you can enter and
+leave at mid price. You can't: opening a position means swapping into the pair and closing it
+means swapping back, and both legs pay the fee and move the price against you.
+
+Given the pool's real token reserves this panel prices that round trip exactly — entry swap, exit
+swap, depth table, and a price-impact curve — then converts it into the number that matters:
+**how many days in the position it takes just to earn the round trip back.**
+
+Two details that are easy to get wrong and are handled explicitly:
+
+- You only swap the part that has to change hands, not the whole position. Full range is 50/50;
+  a concentrated range is not, and the required split comes from the position formulas exactly.
+- The exit is priced against the pool **after** your own liquidity is withdrawn. Pulling out makes
+  the pool thinner, and on a small pool that is most of the exit cost.
+
+The effect is not subtle. Same $10k position, same 0.3% fee:
+
+| Pool size | Position as % of pool | Round trip cost |
+| --- | --- | --- |
+| $20M | 0.05% | 0.35% |
+| $500k | 2% | 2.27% |
+| $100k | 10% | 9.79% |
+| $25k | 40% | 34.4% |
+
+### Where this is valid, and where it refuses to answer
+
+For a constant-product pool the reserves define the whole curve and every number here is exact.
+For a **concentrated-liquidity** pool the totals are inventory spread across many price ranges and
+say nothing about depth at the current price — running the same arithmetic on them would produce a
+confident-looking number that is simply wrong.
+
+The app detects which case it is in from the data rather than trusting the DEX label: on a real
+CPMM pool the reserve ratio equals the spot price to within rounding, and on a concentrated pool it
+does not. A live check across three pools:
+
+| Pool | reserve ratio | spot price | verdict |
+| --- | --- | --- | --- |
+| Uniswap v2 WETH/USDC | 2680.301 | 2680.3011 | curve valid, priced exactly |
+| Uniswap v3 WETH/USDC | 8243.16 | 2673.60 | refuses to quote slippage |
+| Aerodrome Slipstream | 241.43 | 116.40 | refuses to quote slippage |
+
+For concentrated pools the panel still gives the exact deposit split and the position-vs-pool
+ratio, and states plainly that tick-level liquidity — which the free APIs don't expose — is what
+would be needed for the rest.
+
 ## Formulas
 
 Every formula the app uses, shown three ways: symbolically, with this pool's numbers substituted
@@ -107,6 +156,8 @@ These are stated in the UI too, but collected here:
 | LP fee share is a table of per-DEX defaults | These splits change by governance vote | Editable in the assumptions panel; the header says where each fee number came from |
 | Fees accrue on the share of *volume* that traded in range (τ_v), not the share of days (τ) | The busy days and the in-range days are often not the same days | Using the day count overstated fees by ~45% on a tight WETH/USDC range in testing, so the model uses τ_v and the UI shows both |
 | The what-if model holds volume flat at the trailing average | A single forward number has to come from somewhere | The sweep and heat grid exist precisely so you can see what other volumes would do |
+| Execution cost assumes both swaps route through this pool | Modelling aggregator routing needs quotes the free APIs don't give | Overstates cost for well-traded pairs, where an aggregator finds a better path; accurate for thin pools, which are the ones where it matters |
+| Execution cost is priced off the pool's own mid, not an external USD price | The two data sources are sampled independently and disagreed by 0.25% on a live pool — comparable to the fee itself | Keeps a symmetric round trip symmetric instead of leaking source disagreement into "cost" |
 | Stableswap, weighted and Pendle pools use the constant-product IL formula | It's the only closed form that fits every pool type | Flagged in the risk list — for those pools treat the IL column as an upper bound (stableswap) or as not applicable (Pendle) |
 
 Fee tiers are read from the pool itself where the API exposes them (concentrated-liquidity pools),

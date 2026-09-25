@@ -117,6 +117,7 @@ LP.ui = (function () {
       state.overrides.fee = null;
       state.overrides.lpShare = null;
       LP.whatif.reset();
+      LP.execution.reset();
 
       // Start with a range width that reflects how this pair actually moves over the hold period.
       const suggestion = LP.backtest.suggestRange(
@@ -178,6 +179,7 @@ LP.ui = (function () {
       renderGoalVR(r),
       renderGoalFeesVsIl(r),
       r.isCl ? renderGoalRange(r) : renderNonClNote(r),
+      LP.execution.render(r),
       LP.whatif.render(r),
       LP.whatif.renderFormulas(r),
       renderFlags(r),
@@ -187,6 +189,7 @@ LP.ui = (function () {
     ].join('\n');
     wrapWideTables();
     wireResultEvents();
+    LP.execution.wire();
     LP.whatif.wire();
   }
 

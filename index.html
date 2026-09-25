@@ -291,6 +291,22 @@
   .sqrt::before { margin-left: -0.62em; border-top: 0; }
   table.symbols td.sym { font-family: var(--mono); font-weight: 700; width: 1%; white-space: nowrap; }
 
+
+  /* ------------------------------------------------- execution cost panel */
+  .exec-ctl { margin: 14px 0 6px; }
+  .exec-ctl label { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 10px; }
+  .exec-ctl select { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card-2); color: var(--text); font-size: 13.5px; }
+  .callout.warn { background: color-mix(in srgb, var(--weak) 12%, var(--card-2));
+    border-color: color-mix(in srgb, var(--weak) 45%, var(--line)); }
+  svg.impact { width: 100%; height: auto; background: var(--card-2);
+    border: 1px solid var(--line); border-radius: 10px; }
+  svg.impact text { fill: var(--muted); font-size: 11px; font-family: var(--mono); }
+  svg.impact .eg { stroke: var(--line); stroke-width: 1; }
+  svg.impact .eline { fill: none; stroke: var(--accent); stroke-width: 2.2; }
+  svg.impact .emark { stroke: var(--text); stroke-width: 1.2; stroke-dasharray: 3 3; opacity: .6; }
+  svg.impact .edot { fill: var(--bad); }
+
   code { font-family: var(--mono); font-size: 0.9em; background: var(--card-2); padding: 1px 5px; border-radius: 4px; }
 </style>
 </head>
@@ -327,9 +343,11 @@
 <script src="js/fees.js"></script>
 <script src="js/api.js"></script>
 <script src="js/backtest.js"></script>
+<script src="js/swap.js"></script>
 <script src="js/model.js"></script>
 <script src="js/formulas.js"></script>
 <script src="js/analyze.js"></script>
+<script src="js/execution.js"></script>
 <script src="js/whatif.js"></script>
 <script src="js/ui.js"></script>
 </body>

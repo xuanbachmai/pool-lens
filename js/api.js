@@ -29,9 +29,18 @@ LP.api = (function () {
       try {
         res = await fetch(url, { headers: { accept: 'application/json' } });
       } catch (e) {
-        throw new NetworkError(
-          'Could not reach ' + new URL(url).host + '. Check your connection, or a browser ' +
-          'extension may be blocking the request.'
+        /*
+         * A rate-limited response from GeckoTerminal comes back without the CORS header, so
+         * the browser surfaces the 429 as an opaque network/CORS failure rather than a status
+         * code we can read. Blaming the user's connection here would be wrong most of the
+         * time, so name the likelier cause first.
+         */
+        const host = new URL(url).host;
+        throw new RateLimitError(
+          'The request to ' + host + ' was blocked before a response could be read. That is ' +
+          'almost always the free tier rate limit (about 30 requests per minute) — it drops ' +
+          'the CORS header on rejected requests, so the browser cannot see the 429. Wait a ' +
+          'moment and analyse again. If it persists, check your connection or an ad blocker.'
         );
       }
       if (res.status === 429) {
