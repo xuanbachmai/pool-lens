@@ -17,6 +17,8 @@ js/analyze.js       the analysis engine
 js/backtest.js      range replay against real daily bars
 js/swap.js          constant-product curve maths: quotes, slippage, entry/exit cost
 js/execution.js     the "getting in and out" panel
+js/position.js      your saved position, and how it has actually done
+js/strategy.js      ranked strategies and the exact levels to watch
 js/model.js         one closed-form model of a position, built to be perturbed
 js/formulas.js      the formula catalogue, with live numbers substituted in
 js/whatif.js        sensitivity panel + formulas panel
@@ -139,6 +141,31 @@ does not. A live check across three pools:
 For concentrated pools the panel still gives the exact deposit split and the position-vs-pool
 ratio, and states plainly that tick-level liquidity — which the free APIs don't expose — is what
 would be needed for the rest.
+
+## Your position, strategies and alerts
+
+Tell the app what you actually hold — size, entry price, entry date, and your range — and it
+replays that position against the pool's real daily bars since the day you opened it. Positions
+are saved per pool in `localStorage`, so they survive a reload and nothing leaves your machine.
+
+**Strategies** are ranked by relevance on a single 0–100 scale, and each one carries its own
+arithmetic — cost, gain and payback. A strategy whose economics can't be computed isn't offered,
+because "consider rebalancing" without a number is a horoscope. The set covers holding,
+re-centring a range, changing width to the one the backtest actually favours, hedging the
+directional exposure, switching fee tier, and closing.
+
+The hedge size is computed rather than hand-waved: for a full-range position `V = Q·√r`, so the
+delta at entry is exactly half the position's value in base exposure. For a concentrated position
+there's no clean closed form worth hard-coding, so the position value is differentiated
+numerically.
+
+**Alerts** are numbers, not moods. Each is a level you can paste into whatever alerting you
+already use: where your range breaks, where fees stop covering divergence, the daily volume the
+pool needs to stay above the benchmark, and how long until your entry cost is earned back. On
+revisit the app re-fetches and marks which have already fired.
+
+This page has no backend, so **it cannot push a notification** — that limit is stated in the UI
+rather than papered over. What it does is compute the exact triggers and tell you which have hit.
 
 ## Formulas
 

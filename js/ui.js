@@ -118,6 +118,7 @@ LP.ui = (function () {
       state.overrides.lpShare = null;
       LP.whatif.reset();
       LP.execution.reset();
+      LP.position.reset();
 
       // Start with a range width that reflects how this pair actually moves over the hold period.
       const suggestion = LP.backtest.suggestRange(
@@ -179,6 +180,8 @@ LP.ui = (function () {
       renderGoalVR(r),
       renderGoalFeesVsIl(r),
       r.isCl ? renderGoalRange(r) : renderNonClNote(r),
+      LP.position.render(r),
+      LP.strategy.render(r),
       LP.execution.render(r),
       LP.whatif.render(r),
       LP.whatif.renderFormulas(r),
@@ -189,6 +192,12 @@ LP.ui = (function () {
     ].join('\n');
     wrapWideTables();
     wireResultEvents();
+    // The position card re-renders the whole result when it changes, since the strategies and
+    // alerts below it are all derived from the position.
+    LP.position.wire((warning) => {
+      if (warning) setStatus('warn', esc(warning));
+      render(state.result);
+    });
     LP.execution.wire();
     LP.whatif.wire();
   }
