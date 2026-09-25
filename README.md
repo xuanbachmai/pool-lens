@@ -6,7 +6,9 @@ Open `index.html` in a browser. That's the whole install — no server, no build
 no dependencies. Everything runs client-side against two free public APIs.
 
 ```
-index.html          markup + styles
+index.html          the pool analyser
+amm.html            the AMM formula demo, standalone
+css/app.css         shared stylesheet for both pages
 js/util.js          number formatting and small maths helpers
 js/parse.js         pasted URL -> { chain, address }
 js/fees.js          swap fee per DEX, and how much of it the LP actually keeps
@@ -18,7 +20,8 @@ js/execution.js     the "getting in and out" panel
 js/model.js         one closed-form model of a position, built to be perturbed
 js/formulas.js      the formula catalogue, with live numbers substituted in
 js/whatif.js        sensitivity panel + formulas panel
-js/ui.js            rendering and event wiring
+js/lab.js           the AMM demo's controls and charts
+js/ui.js            rendering and event wiring for the analyser
 ```
 
 You can also deep-link: `index.html?url=<pool url>`.
@@ -28,6 +31,28 @@ If you prefer to serve it rather than open the file directly, there is a launch 
 ```bash
 py -3 -m http.server 8765
 ```
+
+## Two pages
+
+**`index.html`** analyses a real pool you paste a link to.
+
+**`amm.html`** is a standalone demo of the formula underneath it — drag a trade along the curve,
+compare depth across pool sizes, test whether splitting an order helps, watch impermanent loss
+against the price ratio, and find the arbitrage that closes a gap.
+
+The demo is not a second implementation. It imports `js/swap.js` and `js/analyze.js` — the exact
+modules the analyser runs on — so the two cannot drift apart. If a formula is wrong in the demo it
+is wrong in the tool, which is the point of sharing them.
+
+Things the demo makes concrete, all computed live rather than asserted:
+
+- At **zero fee, splitting a trade changes nothing** — one trade and twenty pieces both cost
+  150.0000 to four decimals, because the curve is path-independent. Add a fee and each piece
+  raises k, so splitting always costs more.
+- **IL(r) = IL(1/r)**: −50% and +100% both cost exactly 5.719%.
+- The **no-arbitrage band is only a fee wide** — $2,991.00 to $3,009.03 on a $3,000 pool at 0.30%,
+  which is ±f/(1−f). Set the fee to zero and it collapses to a point.
+- The same 20 ETH trade costs **25.4% in a 100 ETH pool and 2.3% in a 1,000 ETH pool**.
 
 ## What it answers
 

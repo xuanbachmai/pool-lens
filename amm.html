@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>x · y = k — the AMM formula, moving</title>
+<link rel="stylesheet" href="css/app.css">
+<style>
+  /* Page-specific: the demo's charts and control grid. */
+  .lab-grid { display: grid; grid-template-columns: 300px 1fr; gap: 22px; align-items: start; }
+  @media (max-width: 800px) { .lab-grid { grid-template-columns: 1fr; } }
+  .lab-grid > * { min-width: 0; }
+  .lab-ctrl { display: grid; gap: 15px; align-content: start; }
+  .lab-ctrl label { display: block; font-size: 12.5px; color: var(--muted); }
+  .lab-ctrl .lab-val { float: right; font-family: var(--mono); font-weight: 600; color: var(--text); }
+  .lab-ctrl input[type=range] { width: 100%; margin-top: 7px; accent-color: var(--accent); }
+  .lab-ctrl select {
+    width: 100%; margin-top: 5px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--card-2); color: var(--text); font-size: 13.5px;
+  }
+
+  svg.lab { width: 100%; height: auto; background: var(--card-2);
+            border: 1px solid var(--line); border-radius: 10px; }
+  svg.lab text { fill: var(--muted); font-size: 11px; font-family: var(--mono); }
+  svg.lab .lg { stroke: var(--line); stroke-width: 1; }
+  svg.lab .lzero { stroke: var(--muted); stroke-width: 1; opacity: .7; }
+  svg.lab .lcurve { fill: none; stroke: var(--accent); stroke-width: 2.4; }
+  svg.lab .ltan { stroke: var(--muted); stroke-dasharray: 5 4; stroke-width: 1.2; }
+  svg.lab .lchord { stroke: var(--bad); stroke-width: 2.2; }
+  svg.lab .lp0 { fill: var(--accent); }
+  svg.lab .lp1 { fill: var(--bad); }
+  svg.lab .lil { fill: none; stroke: var(--bad); stroke-width: 2.4; }
+  svg.lab .lilc { fill: none; stroke: var(--weak); stroke-width: 2.2; stroke-dasharray: 4 3; }
+  svg.lab .lprofit { fill: none; stroke: var(--good); stroke-width: 2.4; }
+  svg.lab .lband { fill: color-mix(in srgb, var(--accent) 16%, transparent); }
+  svg.lab .lmark { stroke: var(--text); stroke-width: 1.2; stroke-dasharray: 3 3; opacity: .55; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px;
+            color: var(--muted); margin-top: 10px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px;
+              vertical-align: middle; margin-right: 6px; }
+  .eq { font-family: var(--mono); font-size: 15px; background: var(--card-2);
+        border: 1px solid var(--line); border-radius: 8px; padding: 10px 13px;
+        margin: 12px 0 0; overflow-x: auto; }
+  .nav { display: flex; gap: 14px; align-items: baseline; margin-bottom: 8px; font-size: 13px; }
+  .nav a { color: var(--accent); text-decoration: none; }
+  .nav a:hover { text-decoration: underline; }
+  .nav .here { color: var(--muted); }
+  .provenance-list { margin: 10px 0 0; padding-left: 20px; color: var(--muted); font-size: 13.5px; }
+  .provenance-list li { margin-bottom: 7px; line-height: 1.55; }
+  .mono { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="nav">
+      <span class="here">AMM formula demo</span>
+      <a href="index.html">→ analyse a real pool</a>
+    </div>
+    <h1>x · y = k</h1>
+    <p>A pool holds two tokens and every trade must leave their product unchanged. That single
+    rule produces the price, the slippage, the impermanent loss and the arbitrage — everything
+    else on this page is a consequence of it. Drag anything; the numbers are computed by the same
+    code the pool analyser runs on, so nothing here is a simplified retelling.</p>
+    <p class="eq">price = y / x &nbsp;·&nbsp; out = Δin·(1−f)·Y / (X + Δin·(1−f))
+      &nbsp;·&nbsp; in = ( X·Y / (Y − Δout) − X ) / (1 − f)</p>
+  </header>
+
+  <main id="results">
+
+    <!-- 1 ---------------------------------------------------------------->
+    <section class="card">
+      <h3>1 · Every swap slides along the curve</h3>
+      <p class="muted">The dashed line is the tangent at the starting point — its slope is the
+      spot price. The red chord is what you actually fill at. The gap between them is slippage,
+      and it grows with your trade relative to the pool.</p>
+      <div class="lab-grid">
+        <div class="lab-ctrl">
+          <label for="poolSize">Pool size <span class="lab-val" id="poolV">100 ETH</span>
+            <input id="poolSize" type="range" min="20" max="2000" step="10" value="100"></label>
+          <label for="trade">Trade, + buys ETH <span class="lab-val" id="tradeV"></span>
+            <input id="trade" type="range" min="-60" max="60" step="0.5" value="20"></label>
+          <label for="fee">Pool fee
+            <select id="fee">
+              <option value="0">0%</option>
+              <option value="0.0005">0.05%</option>
+              <option value="0.003" selected>0.30%</option>
+              <option value="0.01">1.00%</option>
+            </select></label>
+          <div class="metrics" style="grid-template-columns:1fr 1fr">
+            <div class="metric"><span class="m-label">Spot before</span><span class="m-value" id="cSpot0"></span></div>
+            <div class="metric"><span class="m-label">Spot after</span><span class="m-value" id="cSpot1"></span></div>
+            <div class="metric"><span class="m-label">Your fill</span><span class="m-value" id="cFill"></span></div>
+            <div class="metric"><span class="m-label">Price impact</span><span class="m-value" id="cImpact"></span></div>
+            <div class="metric"><span class="m-label">Reserves after</span><span class="m-value" id="cRes" style="font-size:13px"></span></div>
+            <div class="metric"><span class="m-label">Fee to LPs</span><span class="m-value" id="cFee"></span></div>
+          </div>
+          <p class="fineprint">k = <span id="cK"></span>. Buying moves you up-left along the
+          curve: less ETH in the pool, so every further ETH costs more.</p>
+        </div>
+        <div>
+          <svg id="curveSvg" class="lab" viewBox="0 0 600 400" role="img"
+            aria-label="The constant product curve with the spot tangent and your fill chord"></svg>
+          <div class="legend">
+            <span><i style="background:var(--accent)"></i>x · y = k</span>
+            <span><i style="background:var(--muted)"></i>spot price (tangent)</span>
+            <span><i style="background:var(--bad)"></i>your fill (chord)</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2 ---------------------------------------------------------------->
+    <section class="card">
+      <h3>2 · Depth is the whole game</h3>
+      <p class="muted">The same order costs wildly different amounts depending on how much
+      liquidity it is pushing through. Total cost — fee plus slippage — at a
+      <span id="depthFee"></span> fee:</p>
+      <div class="table-scroll"><table id="depthTbl"></table></div>
+      <p class="fineprint">Below roughly 1% of the pool you are paying the fee and little else.
+      Past a few percent, slippage takes over and grows without bound. This is why the analyser
+      treats a thin pool as a risk rather than a high-APR opportunity.</p>
+    </section>
+
+    <!-- 3 ---------------------------------------------------------------->
+    <section class="card">
+      <h3>3 · Does splitting a trade help?</h3>
+      <p class="muted">A 100 / 100 pool, buying token B either in one go or in equal pieces.
+      The intuition that smaller trades get better prices is worth testing.</p>
+      <div class="lab-grid">
+        <div class="lab-ctrl">
+          <label for="splitTot">Total to buy <span class="lab-val" id="splitTotV"></span>
+            <input id="splitTot" type="range" min="5" max="95" step="1" value="60"></label>
+          <label for="splitN">Split into <span class="lab-val" id="splitNV"></span>
+            <input id="splitN" type="range" min="1" max="60" step="1" value="20"></label>
+          <label for="splitFeeSel">Pool fee
+            <select id="splitFeeSel">
+              <option value="0">0% — the pure curve</option>
+              <option value="0.003" selected>0.30%</option>
+              <option value="0.01">1.00%</option>
+              <option value="0.2">20% — a meme coin</option>
+            </select></label>
+          <div class="metrics" style="grid-template-columns:1fr">
+            <div class="metric"><span class="m-label">One trade</span><span class="m-value" id="sOne"></span></div>
+            <div class="metric"><span class="m-label">Split</span><span class="m-value" id="sMany"></span></div>
+            <div class="metric"><span class="m-label">Cost of splitting</span><span class="m-value" id="sExtra"></span></div>
+          </div>
+        </div>
+        <div>
+          <svg id="splitSvg" class="lab" viewBox="0 0 560 260" role="img"
+            aria-label="Total cost against the number of pieces the trade is split into"></svg>
+          <p class="fineprint" id="splitVerdict"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4 ---------------------------------------------------------------->
+    <section class="card">
+      <h3>4 · Being the pool: impermanent loss</h3>
+      <p class="muted">As the price moves, arbitrageurs buy the rising token from you and sell you
+      the falling one. Against simply holding the two tokens you are always behind, by
+      <span class="mono">2√r/(1+r) − 1</span>. Concentrating into a range amplifies it.</p>
+      <div class="lab-grid">
+        <div class="lab-ctrl">
+          <label for="move">Price change <span class="lab-val" id="moveV"></span>
+            <input id="move" type="range" min="-75" max="300" step="1" value="50"></label>
+          <label for="rangeW">Concentrated range <span class="lab-val" id="rangeV"></span>
+            <input id="rangeW" type="range" min="2" max="90" step="1" value="20"></label>
+          <div class="metrics" style="grid-template-columns:1fr 1fr">
+            <div class="metric"><span class="m-label">Hold the two tokens</span><span class="m-value" id="ilHodl"></span></div>
+            <div class="metric"><span class="m-label">Be the pool</span><span class="m-value" id="ilLp"></span></div>
+            <div class="metric"><span class="m-label">Impermanent loss</span><span class="m-value down" id="ilNow"></span></div>
+            <div class="metric"><span class="m-label">In dollars</span><span class="m-value down" id="ilGap"></span></div>
+            <div class="metric"><span class="m-label">Range efficiency</span><span class="m-value" id="clEff"></span></div>
+            <div class="metric"><span class="m-label">Loss in that range</span><span class="m-value down" id="clIl"></span></div>
+          </div>
+          <p class="fineprint">Concentrated loss is <span id="clRatio"></span>. On a $10,000
+          position. IL(r) = IL(1/r), so a halving costs exactly what a doubling does.</p>
+        </div>
+        <div>
+          <svg id="ilSvg" class="lab" viewBox="0 0 600 320" role="img"
+            aria-label="Impermanent loss against the price ratio, full range and concentrated"></svg>
+          <div class="legend">
+            <span><i style="background:var(--bad)"></i>full range</span>
+            <span><i style="background:var(--weak)"></i>concentrated range</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5 ---------------------------------------------------------------->
+    <section class="card">
+      <h3>5 · Arbitrage, and who pays for it</h3>
+      <p class="muted">The pool has no idea what anything is worth. It only learns when somebody
+      trades it back into line — and that somebody is paid out of the liquidity providers' pockets.
+      Inside the fee band no trade is worth making, which is why a higher fee tier bleeds less.</p>
+      <div class="lab-grid">
+        <div class="lab-ctrl">
+          <label for="ext">Price elsewhere <span class="lab-val" id="extV"></span>
+            <input id="ext" type="range" min="1800" max="4400" step="10" value="3300"></label>
+          <label for="gas">Gas and tip <span class="lab-val" id="gasV"></span>
+            <input id="gas" type="range" min="0" max="600" step="5" value="40"></label>
+          <div class="metrics" style="grid-template-columns:1fr">
+            <div class="metric"><span class="m-label">What to do</span><span class="m-value" id="aAction" style="font-size:13px"></span></div>
+          </div>
+          <div class="metrics" style="grid-template-columns:1fr 1fr">
+            <div class="metric"><span class="m-label">Optimal size</span><span class="m-value" id="aSize"></span></div>
+            <div class="metric"><span class="m-label">Pool price after</span><span class="m-value" id="aAfter"></span></div>
+            <div class="metric"><span class="m-label">Gross</span><span class="m-value" id="aGross"></span></div>
+            <div class="metric"><span class="m-label">After gas</span><span class="m-value" id="aNet"></span></div>
+          </div>
+          <p class="fineprint">No-arbitrage band: <span id="aBand" class="mono"></span>. The
+          optimal trade pushes the pool's post-fee marginal price exactly onto the outside price —
+          any further and you are trading against yourself.</p>
+        </div>
+        <div>
+          <svg id="arbSvg" class="lab" viewBox="0 0 600 250" role="img"
+            aria-label="Arbitrage profit after gas against the external price"></svg>
+          <div class="legend">
+            <span><i style="background:color-mix(in srgb,var(--accent) 40%,transparent)"></i>fee band, nothing to do</span>
+            <span><i style="background:var(--good)"></i>profit after gas</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Where this connects</h3>
+      <p class="muted">Each section above is a term in the real analysis:</p>
+      <ul class="provenance-list">
+        <li><strong>Depth</strong> becomes the entry and exit cost of an actual position — on a
+          thin pool the round trip can cost more than months of fees.</li>
+        <li><strong>Impermanent loss</strong> is the thing fee income has to beat; the analyser
+          measures both against the pool's real price history rather than a slider.</li>
+        <li><strong>The fee band</strong> is the structural bleed: every move larger than the band
+          hands an arbitrageur a rebalance at a stale price.</li>
+      </ul>
+      <p style="margin-top:14px"><a class="btn" href="index.html" style="display:inline-block;text-decoration:none">Analyse a real pool →</a></p>
+    </section>
+
+  </main>
+
+  <p class="fineprint" style="margin-top:32px">Educational model: a v2-style pool with the fee
+  taken on the input. Fees are not compounded back into k, and gas is ignored except where shown.
+  Not financial advice.</p>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/analyze.js"></script>
+<script src="js/swap.js"></script>
+<script src="js/lab.js"></script>
+</body>
+</html>
