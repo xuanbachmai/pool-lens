@@ -16,3 +16,8 @@ scratch/
 
 # Claude Code local overrides (machine-specific)
 .claude/settings.local.json
+
+# alert state is written by the scheduled job, not by hand
+
+# node modules (the serverless function pulls the SDK at build time)
+node_modules/

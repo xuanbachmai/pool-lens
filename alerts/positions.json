@@ -1,0 +1,11 @@
+[
+  {
+    "label": "WETH/USDC 0.05% — Uniswap v3",
+    "network": "eth",
+    "address": "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+    "entryPrice": 2400,
+    "rangePct": 15,
+    "sizeUsd": 10000,
+    "tvlAtEntry": 99000000
+  }
+]
