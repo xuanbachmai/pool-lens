@@ -27,6 +27,9 @@ js/lab.js           the AMM demo's controls and charts
 js/llama.js         DefiLlama yields client: emissions split, single/dual exposure
 js/emissions.js     emissions panel on the analyser
 js/screener.js      the farm screener's filters and table
+js/ask.js           natural-language filter box
+api/ask.js          serverless function: language -> filter spec (Vercel)
+alerts/check.mjs    scheduled alert check (GitHub Actions)
 js/ui.js            rendering and event wiring for the analyser
 ```
 
@@ -179,6 +182,36 @@ hidden.
 
 It is loaded only when asked: ~2.4 MB gzipped is not worth pulling on every analysis for a figure
 that is often zero. Both pages share one cache.
+
+## Does it use an LLM?
+
+Only for language. Every number in this app — APY, impermanent loss, slippage, break-even,
+capital efficiency — is closed-form maths over live market data, and that is deliberate: those
+figures are checkable by hand, and a hallucinated one is indistinguishable from a real one.
+
+The one place a model earns its place is translating a sentence into a filter. `api/ask.js` takes
+"single-sided stables above 10% that aren't mostly emissions" and returns filter *parameters* —
+exposure, thresholds, sort order — which are then applied by the same deterministic screening
+code the checkboxes drive. The model never produces a figure that reaches the analysis.
+
+The compiled filter is shown and every control stays editable, so its work can be corrected
+rather than trusted. Structured outputs with a strict JSON schema make the response always
+parse; `claude-opus-5` at low effort, since this is translation rather than reasoning.
+
+The key lives in a Vercel environment variable (`ANTHROPIC_API_KEY`) and never reaches the
+browser. Without it the endpoint returns 501 and the page explains the one-time setup — the rest
+of the screener is unaffected.
+
+## Automated alerts
+
+The web app computes alert levels but cannot send anything: it is a static page, so nothing runs
+once you close the tab. `alerts/check.mjs` is what runs instead — a GitHub Actions cron that
+re-fetches pool state, evaluates the same thresholds, and posts to Telegram or a Discord/Slack
+webhook. Dependency-free; Node 18+ has `fetch` built in.
+
+Alerts fire on the **edge**, not every run. `alerts/state.json` records which conditions were
+already active, so a broken range notifies once rather than every thirty minutes for a week.
+Setup is in [`alerts/README.md`](alerts/README.md).
 
 ## Your position, strategies and alerts
 

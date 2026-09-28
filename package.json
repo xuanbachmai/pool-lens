@@ -1,0 +1,17 @@
+{
+  "name": "pool-lens",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Paste a DEX liquidity pool link, get a first-pass LP analysis.",
+  "type": "module",
+  "scripts": {
+    "alerts": "node alerts/check.mjs",
+    "alerts:dry": "node alerts/check.mjs --dry-run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

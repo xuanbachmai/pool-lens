@@ -372,3 +372,17 @@ li.alert.fired { border-color: color-mix(in srgb, var(--weak) 55%, var(--line));
 .alert-flag { font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
   color: var(--weak); white-space: nowrap; }
 li.alert p { margin: 5px 0 0; font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+/* ------------------------------------------------- natural-language filter box */
+.ask-row { display: flex; gap: 10px; margin-top: 14px; }
+.ask-row input {
+  flex: 1; min-width: 0; padding: 12px 14px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card-2); color: var(--text); font-size: 14.5px;
+}
+.ask-row input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent); }
+.ask-examples { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 12px; }
+.ask-examples .link { font-size: 12.5px; text-align: left; }
+.ask-filter { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 10px 0 0; font-size: 13px; }
+.ask-filter dt { color: var(--muted); }
+.ask-filter dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.card.ask h4 { margin-top: 16px; }
