@@ -8,6 +8,7 @@ no dependencies. Everything runs client-side against two free public APIs.
 ```
 index.html          the pool analyser
 amm.html            the AMM formula demo, standalone
+farm.html           the farm screener: single- and dual-sided
 css/app.css         shared stylesheet for both pages
 js/util.js          number formatting and small maths helpers
 js/parse.js         pasted URL -> { chain, address }
@@ -23,6 +24,9 @@ js/model.js         one closed-form model of a position, built to be perturbed
 js/formulas.js      the formula catalogue, with live numbers substituted in
 js/whatif.js        sensitivity panel + formulas panel
 js/lab.js           the AMM demo's controls and charts
+js/llama.js         DefiLlama yields client: emissions split, single/dual exposure
+js/emissions.js     emissions panel on the analyser
+js/screener.js      the farm screener's filters and table
 js/ui.js            rendering and event wiring for the analyser
 ```
 
@@ -37,6 +41,8 @@ py -3 -m http.server 8765
 ## Two pages
 
 **`index.html`** analyses a real pool you paste a link to.
+
+**`farm.html`** screens ~17,000 farms across both kinds of exposure.
 
 **`amm.html`** is a standalone demo of the formula underneath it — drag a trade along the curve,
 compare depth across pool sizes, test whether splitting an order helps, watch impermanent loss
@@ -141,6 +147,38 @@ does not. A live check across three pools:
 For concentrated pools the panel still gives the exact deposit split and the position-vs-pool
 ratio, and states plainly that tick-level liquidity — which the free APIs don't expose — is what
 would be needed for the rest.
+
+## Is this a good % to farm? — single and dual
+
+`farm.html` pulls DefiLlama's yields dataset and splits farming into the two things that get
+conflated:
+
+- **single-sided** — lending vaults, staked stables, LSTs. No impermanent loss, so the yield *is*
+  the return. The risks sit elsewhere: protocol risk, a stablecoin losing its peg, and withdrawal
+  cooldowns.
+- **dual-sided** — ordinary two-token LP, which has impermanent loss that no headline APY deducts.
+
+The page is built around the one question a headline APY cannot answer: **how much of it is real?**
+DefiLlama splits `apy` into `apyBase` (earned) and `apyReward` (token emissions), so the screener
+defaults to sorting by *earned* yield — sorting by headline APY puts the most emission-dependent
+pools on top by construction. Three presets cover the questions people actually arrive with: real
+yield only, safe single-sided stables, and dual-sided LP.
+
+Emissions aren't worthless, but they dilute as liquidity arrives, they end when a governance vote
+says so, and they pay you in a token whose price you then carry. So the split is a column, and the
+reward share is a bar you can't miss.
+
+### The analyser now counts emissions too
+
+Every panel used to say "emissions are not counted". The analyser can now load the same dataset on
+demand and match the pool by chain plus both token addresses, then by DEX and fee tier. That also
+gives an **independent cross-check on fee APR** — on a live Uniswap v3 WETH/USDC 0.05% pool, this
+app computed 10.52% from reserves and volume while DefiLlama independently reported 10.4976%, a
+0.02pp gap with a 0% TVL difference. Where the two disagree, the disagreement is shown rather than
+hidden.
+
+It is loaded only when asked: ~2.4 MB gzipped is not worth pulling on every analysis for a figure
+that is often zero. Both pages share one cache.
 
 ## Your position, strategies and alerts
 

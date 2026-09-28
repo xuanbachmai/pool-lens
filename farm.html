@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Farm screener — real yield vs emissions</title>
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .sc-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px; margin-top: 16px; }
+  .sc-filters > * { min-width: 0; }
+  .sc-filters label { display: block; font-size: 12.5px; color: var(--muted); }
+  .sc-filters select, .sc-filters input[type=text] {
+    width: 100%; margin-top: 5px; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--card-2); color: var(--text); font-size: 13.5px; }
+  .sc-filters input[type=range] { width: 100%; margin-top: 7px; accent-color: var(--accent); }
+  .sc-filters .v { float: right; font-family: var(--mono); font-weight: 600; color: var(--text); }
+  .sc-checks { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; font-size: 13px;
+    color: var(--muted); }
+  .sc-checks label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+  .sc-checks input { accent-color: var(--accent); }
+  .sc-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .sc-presets .btn { padding: 8px 13px; font-size: 13px; }
+
+  .sc-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .rw-cell { min-width: 150px; }
+  .rw-bar { display: flex; height: 7px; border-radius: 99px; overflow: hidden;
+    background: var(--card-2); border: 1px solid var(--line); }
+  .rw-bar i { display: block; height: 100%; }
+  .rw-base { background: var(--good); }
+  .rw-rew { background: var(--weak); }
+  .rw-label { display: block; font-size: 11px; color: var(--muted); margin-top: 4px;
+    font-family: var(--mono); }
+  .pill.weak { color: var(--weak); border-color: color-mix(in srgb, var(--weak) 45%, var(--line)); }
+  td .pill { margin-right: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="nav">
+      <span class="here">Farm screener</span>
+      <a href="index.html">→ analyse a pool</a>
+      <a href="amm.html">→ how the AMM formula works</a>
+    </div>
+    <h1>What's actually worth farming</h1>
+    <p>Every farm across <span id="scTotal">…</span> pools, split into the two things that get
+    conflated: <strong>single-sided</strong> deposits — lending vaults, staked stables, LSTs, no
+    impermanent loss — and <strong>dual-sided</strong> LP positions, which have it. The one
+    question a headline APY can't answer is how much of it is real, so that is the column this
+    page is built around.</p>
+  </header>
+
+  <div id="scStatus" class="status status-info"></div>
+
+  <main>
+    <section class="card">
+      <h3>Filters</h3>
+      <div class="sc-presets">
+        <button class="btn secondary" id="scPresetReal">Real yield only</button>
+        <button class="btn secondary" id="scPresetSingle">Safe single-sided stables</button>
+        <button class="btn secondary" id="scPresetLp">Dual-sided LP</button>
+      </div>
+
+      <div class="sc-filters">
+        <label>Exposure
+          <select id="scExposure">
+            <option value="any">Either</option>
+            <option value="single">Single-sided (no IL)</option>
+            <option value="multi">Dual-sided LP</option>
+          </select>
+        </label>
+        <label>Chain <select id="scChain"><option value="any">Any chain</option></select></label>
+        <label>Sort by
+          <select id="scSort">
+            <option value="base" selected>Earned yield</option>
+            <option value="apy">Headline APY</option>
+            <option value="mean30">30-day average APY</option>
+            <option value="tvl">TVL</option>
+            <option value="stability">Yield stability</option>
+          </select>
+        </label>
+        <label>Search <input type="text" id="scSearch" placeholder="USDC, pendle, aave…"></label>
+        <label>Minimum TVL <span class="v" id="scTvlV">$1.0M</span>
+          <input type="range" id="scTvl" min="0" max="100" step="1" value="40">
+        </label>
+        <label>Minimum APY <span class="v" id="scApyV">0%</span>
+          <input type="range" id="scApy" min="0" max="100" step="1" value="0">
+        </label>
+        <label>Emissions share <span class="v" id="scRewardV">any</span>
+          <input type="range" id="scReward" min="0" max="100" step="5" value="100">
+        </label>
+        <label>Show <select id="scLimit">
+            <option value="30">30 rows</option>
+            <option value="60" selected>60 rows</option>
+            <option value="150">150 rows</option>
+          </select></label>
+      </div>
+
+      <div class="sc-checks">
+        <label><input type="checkbox" id="scStable"> Stablecoins only</label>
+        <label><input type="checkbox" id="scNoIl"> No impermanent-loss risk</label>
+        <label><input type="checkbox" id="scOutliers" checked> Exclude outliers</label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>What the filter found</h3>
+      <div id="scSummary"></div>
+      <p class="fineprint">Sorting by headline APY puts the most emission-dependent pools on top,
+      which is why this page defaults to sorting by earned yield instead. Emissions are not
+      worthless — but they dilute as liquidity arrives, they end when a vote says so, and they pay
+      you in a token whose price you then carry.</p>
+    </section>
+
+    <section class="card">
+      <h3><span id="scCount">…</span> pools match</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Pool</th>
+            <th class="num">APY</th>
+            <th class="num">Earned</th>
+            <th class="num">Emissions</th>
+            <th>Real vs incentive</th>
+            <th class="num">TVL</th>
+            <th class="num">σ</th>
+            <th>Flags</th>
+          </tr></thead>
+          <tbody id="scBody"></tbody>
+        </table>
+      </div>
+      <div id="scEmpty"></div>
+      <p class="fineprint">σ is the volatility of the yield itself — low means the APY has been
+      steady, high means it has swung around and today's number tells you little. "Outlier" is
+      DefiLlama's own flag for figures it considers unreliable.</p>
+    </section>
+
+    <section class="card">
+      <h3>Reading this page</h3>
+      <ul class="provenance-list">
+        <li><strong>Single-sided</strong> has no impermanent loss, so the yield is the return. The
+          risks are elsewhere: protocol and smart-contract risk, a stablecoin losing its peg, and
+          withdrawal cooldowns — several vaults lock you in for days.</li>
+        <li><strong>Dual-sided</strong> earns swap fees but carries impermanent loss, which the
+          headline APY here does not deduct. Paste one into the analyser to see fees against
+          divergence on that pool's real price history.</li>
+        <li><strong>Emissions</strong> are a real return today and a dilution problem tomorrow. A
+          pool that is 90% emissions is a bet on the reward token and the campaign lasting.</li>
+      </ul>
+      <p style="margin-top:14px"><a class="btn" href="index.html"
+        style="display:inline-block;text-decoration:none">Analyse a specific pool →</a></p>
+    </section>
+  </main>
+
+  <p class="fineprint" style="margin-top:32px">Yield data from DefiLlama. APYs are their
+  calculation, not this app's — the analyser computes its own from pool reserves and volume, and
+  the two are cross-checked there. Not financial advice.</p>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/llama.js"></script>
+<script src="js/screener.js"></script>
+</body>
+</html>

@@ -119,6 +119,7 @@ LP.ui = (function () {
       LP.whatif.reset();
       LP.execution.reset();
       LP.position.reset();
+      LP.emissions.reset();
 
       // Start with a range width that reflects how this pair actually moves over the hold period.
       const suggestion = LP.backtest.suggestRange(
@@ -159,6 +160,7 @@ LP.ui = (function () {
 
   function recompute() {
     if (!state.pool) return;
+    LP.emissions.autoMatch(state.result || { pool: state.pool });
     state.result = LP.analyze.run({
       pool: state.pool,
       cross: state.cross,
@@ -182,6 +184,7 @@ LP.ui = (function () {
       r.isCl ? renderGoalRange(r) : renderNonClNote(r),
       LP.position.render(r),
       LP.strategy.render(r),
+      LP.emissions.render(r),
       LP.execution.render(r),
       LP.whatif.render(r),
       LP.whatif.renderFormulas(r),
@@ -199,6 +202,7 @@ LP.ui = (function () {
       render(state.result);
     });
     LP.execution.wire();
+    LP.emissions.wire(() => render(state.result));
     LP.whatif.wire();
   }
 
