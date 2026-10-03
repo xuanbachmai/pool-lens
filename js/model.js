@@ -216,16 +216,26 @@ LP.model = (function () {
   /** Build the model's base-case parameters from a completed analysis. */
   function paramsFrom(result, opts) {
     const o = opts || {};
-    const pool = result.pool;
-    const bars = (result.range && result.range.bars) ||
-      (result.stats ? result.stats.bars.slice(-result.assumptions.holdDays) : null);
+    /*
+     * Defensive on every nested read. These come from two independent APIs, and a single
+     * missing field used to throw from inside a render -- taking the whole page down rather
+     * than degrading the one panel that needed it.
+     */
+    const pool = (result && result.pool) || {};
+    const volume = pool.volume || {};
+    const fees = (result && result.fees) || {};
+    const assumptions = (result && result.assumptions) || {};
+    const holdDays = assumptions.holdDays || 30;
+    const stats = result && result.stats;
+    const bars = (result && result.range && result.range.bars) ||
+      (stats && Array.isArray(stats.bars) ? stats.bars.slice(-holdDays) : null);
 
     /*
      * Default to the trailing average daily volume over the hold window rather than the last
      * 24 hours, so the base case reconciles with the historical replay instead of resting on
      * one busy day. Today's figure stays available as a scenario.
      */
-    let V = pool.volume.h24 || 0;
+    let V = volume.h24 || 0;
     let vSource = 'last 24h';
     if (bars && bars.length) {
       const avg = bars.reduce((a, b) => a + (b.v || 0), 0) / bars.length;
@@ -237,16 +247,17 @@ LP.model = (function () {
     return {
       V: o.V !== undefined ? o.V : V,
       R: o.R !== undefined ? o.R : (pool.tvlUsd || 0),
-      f: o.f !== undefined ? o.f : result.fees.feePct / 100,
-      s: o.s !== undefined ? o.s : result.fees.lpShare,
-      T: o.T !== undefined ? o.T : result.assumptions.holdDays,
-      Q: o.Q !== undefined ? o.Q : result.assumptions.positionUsd,
-      w: result.isCl ? (o.w !== undefined ? o.w : result.assumptions.rangePct / 100) : null,
+      f: o.f !== undefined ? o.f : (fees.feePct || 0) / 100,
+      s: o.s !== undefined ? o.s : (fees.lpShare === undefined ? 1 : fees.lpShare),
+      T: o.T !== undefined ? o.T : holdDays,
+      Q: o.Q !== undefined ? o.Q : (assumptions.positionUsd || 0),
+      w: result && result.isCl
+        ? (o.w !== undefined ? o.w : (assumptions.rangePct || 20) / 100) : null,
       r: o.r !== undefined ? o.r : r,
-      isCl: result.isCl,
+      isCl: !!(result && result.isCl),
       bars,
       vSource,
-      todayV: pool.volume.h24
+      todayV: volume.h24 || 0
     };
   }
 

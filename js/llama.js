@@ -20,7 +20,8 @@ window.LP = window.LP || {};
 LP.llama = (function () {
   const URL_POOLS = 'https://yields.llama.fi/pools';
 
-  let cache = null;        // resolved pool array
+  let cache = null;        // raw pool array as returned by the API
+  let shaped = null;       // the same rows normalised, built once (see rows())
   let inflight = null;     // de-dupe concurrent callers
 
   /** GeckoTerminal network id -> DefiLlama chain name. */
@@ -60,6 +61,7 @@ LP.llama = (function () {
       }
       const json = await res.json();
       cache = (json && json.data) || [];
+      shaped = null;          // invalidate the normalised view
       inflight = null;
       return cache;
     })();
@@ -68,6 +70,20 @@ LP.llama = (function () {
 
   const isLoaded = () => cache !== null;
   const count = () => (cache ? cache.length : 0);
+
+  /**
+   * The dataset normalised once.
+   *
+   * shape() over ~17,000 rows costs about 35 ms and allocates an object per row. Both screen()
+   * and matchPool() used to call it on every invocation, and screen() runs on the search box's
+   * input event -- so typing one character re-shaped the entire dataset. Doing it once on first
+   * use turns every later filter into predicate checks over an existing array.
+   */
+  function rows() {
+    if (!cache) return [];
+    if (!shaped) shaped = cache.map(shape);
+    return shaped;
+  }
 
   /* ------------------------------------------------------------------- shape */
 
@@ -148,7 +164,7 @@ LP.llama = (function () {
     }
 
     const want = new Set([baseAddr, quoteAddr]);
-    let cands = cache.map(shape).filter((p) => {
+    let cands = rows().filter((p) => {
       if (p.chain !== chain) return false;
       if (p.underlying.length !== 2) return false;
       return p.underlying.every((t) => want.has(t)) && new Set(p.underlying).size === 2;
@@ -215,26 +231,28 @@ LP.llama = (function () {
     if (!cache) return [];
     const opt = o || {};
     const q = String(opt.search || '').trim().toLowerCase();
+    const all = rows();
+    // Named `list`, not `rows`: a local called `rows` shadows the module-level rows() helper
+    // and turns the call above into a temporal-dead-zone error.
+    let list = all;
 
-    let rows = cache.map(shape);
-
-    if (opt.exposure && opt.exposure !== 'any') rows = rows.filter((p) => p.exposure === opt.exposure);
-    if (opt.chain && opt.chain !== 'any') rows = rows.filter((p) => p.chain === opt.chain);
-    if (opt.stablecoin === true) rows = rows.filter((p) => p.stablecoin);
-    if (opt.noIlRisk === true) rows = rows.filter((p) => p.ilRisk === 'no');
-    if (opt.minTvl) rows = rows.filter((p) => p.tvlUsd >= opt.minTvl);
-    if (opt.minApy) rows = rows.filter((p) => p.apy >= opt.minApy);
-    if (opt.minCount) rows = rows.filter((p) => (p.count || 0) >= opt.minCount);
-    if (opt.excludeOutliers) rows = rows.filter((p) => !p.outlier);
+    if (opt.exposure && opt.exposure !== 'any') list = list.filter((p) => p.exposure === opt.exposure);
+    if (opt.chain && opt.chain !== 'any') list = list.filter((p) => p.chain === opt.chain);
+    if (opt.stablecoin === true) list = list.filter((p) => p.stablecoin);
+    if (opt.noIlRisk === true) list = list.filter((p) => p.ilRisk === 'no');
+    if (opt.minTvl) list = list.filter((p) => p.tvlUsd >= opt.minTvl);
+    if (opt.minApy) list = list.filter((p) => p.apy >= opt.minApy);
+    if (opt.minCount) list = list.filter((p) => (p.count || 0) >= opt.minCount);
+    if (opt.excludeOutliers) list = list.filter((p) => !p.outlier);
 
     if (opt.maxRewardShare !== undefined && opt.maxRewardShare !== null) {
-      rows = rows.filter((p) => {
-        const s = rewardShare(p);
-        return s === null ? false : s <= opt.maxRewardShare;
+      list = list.filter((p) => {
+        const sh = rewardShare(p);
+        return sh === null ? false : sh <= opt.maxRewardShare;
       });
     }
     if (q) {
-      rows = rows.filter((p) =>
+      list = list.filter((p) =>
         String(p.symbol || '').toLowerCase().includes(q) ||
         String(p.project || '').toLowerCase().includes(q) ||
         String(p.meta || '').toLowerCase().includes(q));
@@ -249,8 +267,11 @@ LP.llama = (function () {
       mean30: (p) => (p.apyMean30d === null ? -1 : p.apyMean30d)
     }[sort] || ((p) => p.apy);
 
-    rows.sort((a, b) => key(b) - key(a));
-    return opt.limit ? rows.slice(0, opt.limit) : rows;
+    // Copy before sorting: list may still BE the memoised array when no filter narrowed it,
+    // and sorting in place would permanently reorder the shared view for every later caller.
+    const sorted = list === all ? list.slice() : list;
+    sorted.sort((a, b) => key(b) - key(a));
+    return opt.limit ? sorted.slice(0, opt.limit) : sorted;
   }
 
   /** Distinct chains present, most pools first — for building a filter list. */
@@ -261,5 +282,5 @@ LP.llama = (function () {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => ({ chain: c, n }));
   }
 
-  return { load, isLoaded, count, screen, matchPool, shape, rewardShare, chains, CHAINS };
+  return { load, isLoaded, count, rows, screen, matchPool, shape, rewardShare, chains, CHAINS };
 })();

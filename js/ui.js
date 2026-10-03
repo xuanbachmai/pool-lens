@@ -160,7 +160,6 @@ LP.ui = (function () {
 
   function recompute() {
     if (!state.pool) return;
-    LP.emissions.autoMatch(state.result || { pool: state.pool });
     state.result = LP.analyze.run({
       pool: state.pool,
       cross: state.cross,
@@ -168,6 +167,13 @@ LP.ui = (function () {
       feeInfo: currentFeeInfo(),
       assumptions: state.assumptions
     });
+    /*
+     * After the result exists, not before. The DefiLlama match disambiguates sibling pools by
+     * fee tier, which needs result.fees -- running this first handed it a stub without one, so
+     * it fell through to "closest TVL" and could attribute the 0.30% pool's emissions to the
+     * 0.05% pool. Ethereum WETH/USDC alone has 21 candidates across four tiers.
+     */
+    LP.emissions.autoMatch(state.result);
     render(state.result);
   }
 

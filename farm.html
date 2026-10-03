@@ -49,7 +49,8 @@
     conflated: <strong>single-sided</strong> deposits — lending vaults, staked stables, LSTs, no
     impermanent loss — and <strong>dual-sided</strong> LP positions, which have it. The one
     question a headline APY can't answer is how much of it is real, so that is the column this
-    page is built around.</p>
+    page is built around. Dual-sided carries roughly twice the emission dependence of
+    single-sided (22% versus 11% of pools).</p>
   </header>
 
   <div id="scStatus" class="status status-info"></div>
@@ -110,10 +111,13 @@
     <section class="card">
       <h3>What the filter found</h3>
       <div id="scSummary"></div>
-      <p class="fineprint">Sorting by headline APY puts the most emission-dependent pools on top,
-      which is why this page defaults to sorting by earned yield instead. Emissions are not
-      worthless — but they dilute as liquidity arrives, they end when a vote says so, and they pay
-      you in a token whose price you then carry.</p>
+      <p class="fineprint">Emission-heavy pools are a minority — on a recent snapshot about 16% of
+      liquid pools got more than half their yield from incentives, and most carry none at all. But
+      when a pool <em>is</em> one, almost none of its yield is earned: that group averaged 7.8%
+      advertised against 0.9% actually earned. You cannot tell which from the headline number,
+      which is why the split is its own column and why this page sorts by earned yield by default.
+      Emissions are not worthless — they dilute as liquidity arrives, they end when a vote says so,
+      and they pay you in a token whose price you then carry.</p>
     </section>
 
     <section class="card">

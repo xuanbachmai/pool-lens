@@ -21,3 +21,6 @@ scratch/
 
 # node modules (the serverless function pulls the SDK at build time)
 node_modules/
+
+# captured DefiLlama snapshot for tests (regenerate with npm run test:fixture)
+test/fixtures/

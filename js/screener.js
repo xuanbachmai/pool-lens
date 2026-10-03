@@ -7,9 +7,15 @@
  *   multi exposure  -- ordinary two-token LP, which is what the analyser models in depth.
  *
  * The screen is built around one question the headline APY cannot answer: how much of this is
- * real? A pool paying 1,065% entirely in its own token is not a 1,065% pool, and sorting by APY
- * puts exactly those at the top. So the default sort is base yield, emissions are always shown
- * as their own column, and the reward share is rendered as a bar you cannot miss.
+ * real? A pool paying 1,065% entirely in its own token is not a 1,065% pool.
+ *
+ * Measured rather than assumed: emission-heavy pools are a MINORITY -- about 16% of liquid pools
+ * get more than half their yield from incentives, and most carry none. An earlier version of this
+ * comment claimed sorting by APY surfaces them, which the data does not support (only 6 of the
+ * top 25 by APY were majority emissions). What is true is that when a pool IS emission-dependent,
+ * almost none of its yield is earned -- that group averages 7.8% advertised against 0.9% earned --
+ * and the headline number does not reveal it. Hence: base yield as the default sort, emissions as
+ * their own column, and the reward share as a bar you cannot miss.
  */
 window.LP = window.LP || {};
 

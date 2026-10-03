@@ -44,10 +44,17 @@ LP.strategy = (function () {
     };
   }
 
-  /** Round-trip execution cost as a fraction of the position, when the curve is priceable. */
+  /**
+   * Round-trip execution cost as a fraction of the position, when the curve is priceable.
+   *
+   * Every caller already handles null (the cost is simply not shown), so a missing execution
+   * module should degrade to that rather than throwing from inside a render and taking the
+   * whole page with it.
+   */
   function roundTripCost(r, sizeUsd) {
+    if (!LP.execution || typeof LP.execution.ctx !== 'function') return null;
     const c = LP.execution.ctx(r);
-    if (!c.ok || !c.valid.ok) return null;
+    if (!c || !c.ok || !c.valid || !c.valid.ok) return null;
     const rt = LP.swap.roundTrip(c.pool, sizeUsd, c.fee,
       { arriveWith: 'quote', baseFraction: c.baseFrac });
     if (!rt || rt.exitImpossible) return null;

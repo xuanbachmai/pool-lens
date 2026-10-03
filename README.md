@@ -162,14 +162,28 @@ conflated:
 - **dual-sided** — ordinary two-token LP, which has impermanent loss that no headline APY deducts.
 
 The page is built around the one question a headline APY cannot answer: **how much of it is real?**
-DefiLlama splits `apy` into `apyBase` (earned) and `apyReward` (token emissions), so the screener
-defaults to sorting by *earned* yield — sorting by headline APY puts the most emission-dependent
-pools on top by construction. Three presets cover the questions people actually arrive with: real
-yield only, safe single-sided stables, and dual-sided LP.
+DefiLlama splits `apy` into `apyBase` (earned) and `apyReward` (token emissions). Three presets
+cover the questions people actually arrive with: real yield only, safe single-sided stables, and
+dual-sided LP.
 
-Emissions aren't worthless, but they dilute as liquidity arrives, they end when a governance vote
-says so, and they pay you in a token whose price you then carry. So the split is a column, and the
-reward share is a bar you can't miss.
+What the data actually shows — measured on a snapshot in `test/fixtures/`, not assumed:
+
+| | Majority-emissions pools | In the top 25 by APY |
+| --- | --- | --- |
+| Single-sided | 11% | 4% |
+| Dual-sided | 22% | 24% |
+| All liquid pools | 16% | 24% |
+
+So emission-dependence is a **minority** condition, and most pools carry none at all. An earlier
+version of this README claimed that sorting by headline APY surfaces the emission-heavy pools; the
+test suite disproved it (only 6 of the top 25 by APY were majority-emissions, and the median
+emissions share is 0%), and the claim has been corrected here and in the UI.
+
+What *is* true is narrower and more useful: when a pool is emission-dependent, almost none of its
+yield is earned — that group averages **7.8% advertised against 0.9% earned** — and the headline
+number doesn't reveal it. That's why the split is its own column, why the reward share is a bar you
+can't miss, and why the default sort is earned yield: not because APY surfaces emissions, but
+because earned yield never flatters a pool whose yield wouldn't survive the campaign ending.
 
 ### The analyser now counts emissions too
 
@@ -286,6 +300,23 @@ These are stated in the UI too, but collected here:
 Fee tiers are read from the pool itself where the API exposes them (concentrated-liquidity pools),
 parsed from the pool name, or fall back to a per-DEX default. The header badge always says which,
 and `assumed` means you should check the pool page.
+
+## Tests
+
+```bash
+npm test
+```
+
+No dependencies — a small harness loads the browser modules into a fake `window` and runs
+assertions against them. 207 checks across three files: the maths (`math.test.mjs`), the
+app layer (`app.test.mjs`), and the DefiLlama client against a captured snapshot
+(`llama.test.mjs`).
+
+The suite earns its keep. Writing it found five real bugs, one of them in a fix made minutes
+earlier, and disproved a claim this README had been making — details in the commit history.
+
+Refresh the DefiLlama fixture with `npm run test:fixture` (trims a 12 MB response to the
+fields the client reads).
 
 ## Deploying
 
