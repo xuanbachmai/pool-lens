@@ -81,7 +81,7 @@ LP.llama = (function () {
    */
   function rows() {
     if (!cache) return [];
-    if (!shaped) shaped = cache.map(shape);
+    if (!shaped) shaped = cache.map((p) => enrich(shape(p)));
     return shaped;
   }
 
@@ -126,9 +126,95 @@ LP.llama = (function () {
     };
   }
 
+  /** Attach the derived metrics once, at shape time, so screening stays a predicate pass. */
+  function enrich(row) {
+    row.vr = vrRatio(row);
+    const c = confidence(row);
+    row.confidence = c.score;
+    row.confidenceBand = c.band || null;
+    row.confidenceWeakest = c.weakest || null;
+    return row;
+  }
+
   function num(v) {
     const n = typeof v === 'number' ? v : parseFloat(v);
     return Number.isFinite(n) ? n : null;
+  }
+
+  /**
+   * Volume / reserves, the metric the OTS notes call the most important one for choosing a
+   * pool. DefiLlama reports swap volume for about 65% of dual-sided pools and none of the
+   * single-sided ones (a lending vault has no swaps), so this is null where it cannot be known
+   * rather than zero -- those are very different claims.
+   */
+  function vrRatio(row) {
+    if (!(row.tvlUsd > 0)) return null;
+    if (row.volumeUsd1d === null || !(row.volumeUsd1d >= 0)) return null;
+    return row.volumeUsd1d / row.tvlUsd;
+  }
+
+  /**
+   * How much the headline number can be trusted -- NOT how good the pool is.
+   *
+   * A yield figure is a snapshot, and snapshots lie. Measured across the dataset: for the
+   * bottom decile of pools today's APY is under 0.40x its own 30-day average, for the top
+   * decile it is over 1.46x, 5% are showing more than double, and 6% have under a month of
+   * history behind them. None of that is visible in the number itself.
+   *
+   * Scored on four things the data does support, each a reason to distrust:
+   *   history   - days of observations behind the figure
+   *   stability - sigma, the volatility of the APY itself
+   *   spike     - today versus the pool's own 30-day mean
+   *   durability- how much of it is emissions, which end when a vote says so
+   *
+   * Deliberately not included: the size of the yield. A trustworthy 4% scores higher than a
+   * suspect 400%, which is the whole point.
+   */
+  function confidence(row) {
+    const parts = [];
+    const clamp = (v) => Math.max(0, Math.min(100, v));
+
+    // History: 30 days is a pass, 180+ is full marks.
+    if (row.count !== null) {
+      parts.push({ key: 'history', weight: 1.2, score: clamp((row.count / 180) * 100),
+        note: row.count + ' days of data' });
+    }
+
+    // Stability of the APY itself. sigma under ~0.3 is steady, over ~1.5 is noise.
+    if (row.sigma !== null) {
+      parts.push({ key: 'stability', weight: 1.0, score: clamp(100 - (row.sigma / 1.5) * 100),
+        note: 'sigma ' + row.sigma.toFixed(2) });
+    }
+
+    // Spike: today against the pool's own 30-day mean. 1.0 is ideal in both directions.
+    if (row.apyMean30d !== null && row.apyMean30d > 0 && row.apy > 0) {
+      const ratio = row.apy / row.apyMean30d;
+      const drift = Math.abs(Math.log(ratio));          // symmetric: 2x and 0.5x score alike
+      parts.push({ key: 'spike', weight: 1.3, score: clamp(100 - (drift / Math.log(3)) * 100),
+        note: ratio.toFixed(2) + 'x its 30-day mean' });
+    }
+
+    // Durability: emissions are real income that stops on a governance vote.
+    const share = rewardShare(row);
+    if (share !== null) {
+      parts.push({ key: 'durability', weight: 0.9, score: clamp(100 - share * 100),
+        note: Math.round(share * 100) + '% emissions' });
+    }
+
+    if (!parts.length) return { score: null, parts: [], reason: 'no history reported' };
+
+    let score = parts.reduce((a, p) => a + p.weight * p.score, 0) /
+                parts.reduce((a, p) => a + p.weight, 0);
+
+    // DefiLlama's own unreliability flag caps the result rather than nudging it.
+    if (row.outlier) score = Math.min(score, 25);
+
+    return {
+      score,
+      parts,
+      band: score >= 75 ? 'high' : score >= 50 ? 'fair' : score >= 30 ? 'low' : 'poor',
+      weakest: parts.slice().sort((a, b) => a.score - b.score)[0]
+    };
   }
 
   /** Share of the headline APY that is token emissions rather than earned yield. */
@@ -244,6 +330,10 @@ LP.llama = (function () {
     if (opt.minApy) list = list.filter((p) => p.apy >= opt.minApy);
     if (opt.minCount) list = list.filter((p) => (p.count || 0) >= opt.minCount);
     if (opt.excludeOutliers) list = list.filter((p) => !p.outlier);
+    if (opt.minConfidence) list = list.filter((p) => (p.confidence || 0) >= opt.minConfidence);
+    if (opt.minVr) list = list.filter((p) => p.vr !== null && p.vr >= opt.minVr);
+    // V/R above ~5 is usually looped or wash volume rather than a genuinely busy pool.
+    if (opt.maxVr) list = list.filter((p) => p.vr === null || p.vr <= opt.maxVr);
 
     if (opt.maxRewardShare !== undefined && opt.maxRewardShare !== null) {
       list = list.filter((p) => {
@@ -264,7 +354,9 @@ LP.llama = (function () {
       base: (p) => (p.apyBase === null ? -1 : p.apyBase),
       tvl: (p) => p.tvlUsd,
       stability: (p) => -(p.sigma === null ? 1e9 : p.sigma),
-      mean30: (p) => (p.apyMean30d === null ? -1 : p.apyMean30d)
+      mean30: (p) => (p.apyMean30d === null ? -1 : p.apyMean30d),
+      confidence: (p) => (p.confidence === null ? -1 : p.confidence),
+      vr: (p) => (p.vr === null ? -1 : p.vr)
     }[sort] || ((p) => p.apy);
 
     // Copy before sorting: list may still BE the memoised array when no filter narrowed it,
@@ -282,5 +374,6 @@ LP.llama = (function () {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => ({ chain: c, n }));
   }
 
-  return { load, isLoaded, count, rows, screen, matchPool, shape, rewardShare, chains, CHAINS };
+  return { load, isLoaded, count, rows, screen, matchPool, shape, enrich, rewardShare,
+           vrRatio, confidence, chains, CHAINS };
 })();

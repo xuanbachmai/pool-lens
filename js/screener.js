@@ -33,6 +33,9 @@ LP.screener = (function () {
     minTvl: 1e6,
     minApy: 0,
     maxRewardShare: null,
+    minConfidence: 0,
+    minVr: 0,
+    maxVr: 0,
     minCount: 0,
     search: '',
     sort: 'base',
@@ -105,6 +108,13 @@ LP.screener = (function () {
         </div>
         <span class="rw-label ${pctReward > 50 ? 'down' : ''}">${u.pct(pctReward, 0)} emissions</span>`;
 
+      const conf = p.confidence === null ? null : Math.round(p.confidence);
+      const confCell = conf === null
+        ? '<span class="muted">—</span>'
+        : '<span class="conf conf-' + esc(p.confidenceBand) + '" title="' +
+          esc(p.confidenceWeakest ? 'weakest signal: ' + p.confidenceWeakest.note : '') +
+          '">' + conf + '</span>';
+
       return `<tr>
         <td>
           <strong>${esc(p.symbol || '')}</strong>
@@ -114,8 +124,10 @@ LP.screener = (function () {
         <td class="num up">${p.apyBase === null ? '—' : u.pct(p.apyBase, 1)}</td>
         <td class="num ${pctReward !== null && pctReward > 50 ? 'down' : ''}">${p.apyReward === null ? '—' : u.pct(p.apyReward, 1)}</td>
         <td class="rw-cell">${bar}</td>
+        <td class="num">${confCell}</td>
+        <td class="num ${p.vr !== null && p.vr >= 0.25 && p.vr <= 5 ? 'up' : ''}">${
+          p.vr === null ? '<span class="muted">n/a</span>' : u.ratio(p.vr, 2)}</td>
         <td class="num">${u.usd(p.tvlUsd)}</td>
-        <td class="num">${p.sigma === null ? '—' : u.ratio(p.sigma, 2)}</td>
         <td>
           <span class="pill ${p.exposure === 'single' ? 'good' : ''}">${esc(p.exposure || '?')}</span>
           ${p.stablecoin ? '<span class="pill">stable</span>' : ''}
@@ -144,6 +156,12 @@ LP.screener = (function () {
       return s !== null && s > 0.5;
     }).length;
 
+    // The contrast that justifies the whole page: the biggest number and the most
+    // trustworthy number are almost never the same pool.
+    const scored = rows.filter((p) => p.confidence !== null);
+    const trusted = scored.slice().sort((a, b) => b.confidence - a.confidence)[0];
+    const topConf = top.confidence === null ? null : Math.round(top.confidence);
+
     $('scSummary').innerHTML = `
       <div class="metrics">
         ${metric('Matching pools', rows.length.toLocaleString('en-US'),
@@ -151,11 +169,14 @@ LP.screener = (function () {
           ') are more than half emissions')}
         ${metric('Highest advertised', u.pct(top.apy, 0),
           esc(top.symbol) + ' · ' + esc(top.project) +
-          (topShare === null ? '' : ' · ' + u.pct(topShare * 100, 0) + ' of it emissions'),
-          topShare !== null && topShare > 0.5 ? 'weak' : '')}
+          (topConf === null ? '' : ' · confidence ' + topConf + '/100'),
+          topConf !== null && topConf < 50 ? 'weak' : '')}
         ${metric('Highest earned yield', real.apyBase === null ? '—' : u.pct(real.apyBase, 1),
           esc(real.symbol) + ' · ' + esc(real.project) +
           (realShare === null ? '' : ' · ' + u.pct(realShare * 100, 0) + ' emissions'), 'good')}
+        ${trusted ? metric('Most trustworthy figure', u.pct(trusted.apy, 1),
+          esc(trusted.symbol) + ' · ' + esc(trusted.project) + ' · confidence ' +
+          Math.round(trusted.confidence) + '/100', 'good') : ''}
       </div>`;
   }
 
@@ -199,6 +220,21 @@ LP.screener = (function () {
       draw();
     });
     on('scLimit', 'change', () => { state.limit = +$('scLimit').value; draw(); });
+    on('scConf', 'input', () => {
+      state.minConfidence = +$('scConf').value;
+      $('scConfV').textContent = state.minConfidence === 0 ? 'any' : state.minConfidence + '+';
+      draw();
+    });
+    on('scVr', 'change', () => {
+      const v = $('scVr').value;
+      // Capping V/R at 5 is the point of the benchmark options: above that it is almost always
+      // looped or wash volume rather than a genuinely busy pool.
+      if (v === 'bench') { state.minVr = 0.25; state.maxVr = 5; }
+      else if (v === 'high') { state.minVr = 1; state.maxVr = 5; }
+      else if (v === 'suspect') { state.minVr = 5; state.maxVr = 0; }
+      else { state.minVr = 0; state.maxVr = 0; }
+      draw();
+    });
 
     // Presets: the three questions people actually arrive with.
     on('scPresetReal', 'click', () => applyPreset({
@@ -211,7 +247,21 @@ LP.screener = (function () {
     }));
     on('scPresetLp', 'click', () => applyPreset({
       exposure: 'multi', stablecoin: false, noIlRisk: false, minTvl: 2e6, minApy: 10,
-      maxRewardShare: null, sort: 'apy', excludeOutliers: true, chain: 'any', search: ''
+      maxRewardShare: null, sort: 'apy', excludeOutliers: true, chain: 'any', search: '',
+      minConfidence: 0, minVr: 0, maxVr: 0
+    }));
+    // Boring and verifiable rather than spectacular and unproven.
+    on('scPresetTrusted', 'click', () => applyPreset({
+      exposure: 'any', stablecoin: false, noIlRisk: false, minTvl: 5e6, minApy: 6,
+      maxRewardShare: null, sort: 'confidence', excludeOutliers: true, chain: 'any', search: '',
+      minConfidence: 70, minVr: 0, maxVr: 0
+    }));
+    // The OTS notes' ideal setup: heavily traded relative to its own size, with the
+    // implausible readings that are really wash volume excluded.
+    on('scPresetTurnover', 'click', () => applyPreset({
+      exposure: 'multi', stablecoin: false, noIlRisk: false, minTvl: 2e6, minApy: 0,
+      maxRewardShare: null, sort: 'vr', excludeOutliers: true, chain: 'any', search: '',
+      minConfidence: 40, minVr: 0.25, maxVr: 5
     }));
   }
 
@@ -237,6 +287,10 @@ LP.screener = (function () {
     const rw = state.maxRewardShare === null ? 100 : Math.round(state.maxRewardShare * 100);
     $('scReward').value = rw;
     $('scRewardV').textContent = rw >= 100 ? 'any' : 'at most ' + rw + '%';
+    $('scConf').value = state.minConfidence || 0;
+    $('scConfV').textContent = !state.minConfidence ? 'any' : state.minConfidence + '+';
+    $('scVr').value = state.minVr >= 5 ? 'suspect'
+      : state.minVr >= 1 ? 'high' : state.minVr > 0 ? 'bench' : 'any';
   }
 
   function applyPreset(o) {

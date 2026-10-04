@@ -7,6 +7,7 @@ no dependencies. Everything runs client-side against two free public APIs.
 
 ```
 index.html          the pool analyser
+book.html           every saved position at once
 amm.html            the AMM formula demo, standalone
 farm.html           the farm screener: single- and dual-sided
 css/app.css         shared stylesheet for both pages
@@ -27,6 +28,7 @@ js/lab.js           the AMM demo's controls and charts
 js/llama.js         DefiLlama yields client: emissions split, single/dual exposure
 js/emissions.js     emissions panel on the analyser
 js/screener.js      the farm screener's filters and table
+js/portfolio.js     the book: totals, concentration, urgency ranking
 js/ask.js           natural-language filter box
 api/ask.js          serverless function: language -> filter spec (Vercel)
 alerts/check.mjs    scheduled alert check (GitHub Actions)
@@ -44,6 +46,8 @@ py -3 -m http.server 8765
 ## Two pages
 
 **`index.html`** analyses a real pool you paste a link to.
+
+**`book.html`** shows every position you've saved at once.
 
 **`farm.html`** screens ~17,000 farms across both kinds of exposure.
 
@@ -226,6 +230,65 @@ webhook. Dependency-free; Node 18+ has `fetch` built in.
 Alerts fire on the **edge**, not every run. `alerts/state.json` records which conditions were
 already active, so a broken range notifies once rather than every thirty minutes for a week.
 Setup is in [`alerts/README.md`](alerts/README.md).
+
+## Is this number even real? — the confidence score
+
+A yield figure is a snapshot, and snapshots lie. Measured across the dataset: for the bottom
+decile of pools today's APY is under **0.40x** its own 30-day average, for the top decile it is
+over **1.46x**, 5% are showing more than double, and 6% have under a month of history behind them.
+None of that is visible in the number itself.
+
+So the screener scores **how much the figure can be trusted** — explicitly not how good the pool
+is — on four things the data supports: days of history, the volatility of the APY itself, how far
+today sits from the pool's own 30-day mean, and how much is emissions. DefiLlama's own
+unreliability flag caps the result rather than nudging it.
+
+The size of the yield is deliberately *not* an input. A trustworthy 4% scores higher than a
+suspect 400%, which is the entire point:
+
+| Ranked by headline APY | Confidence | Weakest signal |
+| --- | --- | --- |
+| 43,041% USDC-PROS | **25 poor** | sigma 9.42 |
+| 20,625% USDC-VELVET | **25 poor** | sigma 8.83 |
+| 500% CDT-BTC | **25 poor** | **2 days of data** |
+
+| Ranked by confidence | APY | |
+| --- | --- | --- |
+| UPSSYLVA / upshift | 27% | **100 high** |
+| COREUSDC / upshift | 10% | **100 high** |
+
+Five pools in the set advertise over 1,000% APY. At a confidence floor of 70, **none** survive.
+
+## V/R across every pool
+
+The OTS notes call volume-over-reserves the single most important metric for picking a pool, and
+the analyser has always computed it for one pool. The screener now computes it for all 739
+dual-sided pools that report swap volume — DefiLlama doesn't rank by it. Only **31%** clear the
+0.25 benchmark.
+
+It is blank, not zero, for single-sided pools: a lending vault has no swaps, and "unknown" and
+"none" are different claims. Anything above about 5x is usually looped or wash volume rather than
+a genuinely busy pool, so the presets cap it there — `CDT-OSMO` at V/R 858 is not a find.
+
+## Your book
+
+Every page before this reasoned about one pool. A book asks different questions, and `book.html`
+answers them from the positions already in local storage:
+
+- **Which position needs attention first** — ranked by urgency, not size. A broken range outranks
+  a large position, because capital earning nothing is the costliest state to leave alone.
+- **How much capital is earning nothing** — the share of the book sitting outside its range. The
+  number nobody tracks.
+- **Whether five positions are really one bet** — token and chain concentration. Positions in
+  different pools are not diversification if they share a token.
+
+It also catches a mistake that silently produces a confident catastrophe. A pool's price is quoted
+base-in-quote, and which token is "base" is the data source's choice — a WETH/USDC pool may be
+indexed as USDC/WETH, where the price is 0.00037 rather than 2700. Entering it the wrong way round
+gives a price ratio off by orders of magnitude, and the IL formula returns **-100%** for it, which
+reads exactly like a real answer. Those positions are now flagged, excluded from the book's
+totals, and offered the inverse. On the test book that was the difference between **-16.02% on
+$50,000** and **+4.97% on $40,000**.
 
 ## Your position, strategies and alerts
 

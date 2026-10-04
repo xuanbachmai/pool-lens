@@ -42,6 +42,7 @@
     <div class="nav">
       <span class="here">Farm screener</span>
       <a href="index.html">→ analyse a pool</a>
+      <a href="book.html">→ your book</a>
       <a href="amm.html">→ how the AMM formula works</a>
     </div>
     <h1>What's actually worth farming</h1>
@@ -64,6 +65,8 @@
         <button class="btn secondary" id="scPresetReal">Real yield only</button>
         <button class="btn secondary" id="scPresetSingle">Safe single-sided stables</button>
         <button class="btn secondary" id="scPresetLp">Dual-sided LP</button>
+        <button class="btn secondary" id="scPresetTrusted">Trustworthy numbers</button>
+        <button class="btn secondary" id="scPresetTurnover">High turnover (V/R)</button>
       </div>
 
       <div class="sc-filters">
@@ -82,6 +85,8 @@
             <option value="mean30">30-day average APY</option>
             <option value="tvl">TVL</option>
             <option value="stability">Yield stability</option>
+            <option value="confidence">Confidence in the figure</option>
+            <option value="vr">Volume / reserves</option>
           </select>
         </label>
         <label>Search <input type="text" id="scSearch" placeholder="USDC, pendle, aave…"></label>
@@ -93,6 +98,17 @@
         </label>
         <label>Emissions share <span class="v" id="scRewardV">any</span>
           <input type="range" id="scReward" min="0" max="100" step="5" value="100">
+        </label>
+        <label>Minimum confidence <span class="v" id="scConfV">any</span>
+          <input type="range" id="scConf" min="0" max="90" step="5" value="0">
+        </label>
+        <label>Volume / reserves
+          <select id="scVr">
+            <option value="any">Any turnover</option>
+            <option value="bench">Above the 0.25 benchmark</option>
+            <option value="high">Heavily traded (1–5×)</option>
+            <option value="suspect">Implausible (over 5×)</option>
+          </select>
         </label>
         <label>Show <select id="scLimit">
             <option value="30">30 rows</option>
@@ -130,17 +146,23 @@
             <th class="num">Earned</th>
             <th class="num">Emissions</th>
             <th>Real vs incentive</th>
+            <th class="num" title="How much the figure can be trusted, 0-100">Conf.</th>
+            <th class="num" title="Daily volume / reserves. Benchmark 0.25">V/R</th>
             <th class="num">TVL</th>
-            <th class="num">σ</th>
             <th>Flags</th>
           </tr></thead>
           <tbody id="scBody"></tbody>
         </table>
       </div>
       <div id="scEmpty"></div>
-      <p class="fineprint">σ is the volatility of the yield itself — low means the APY has been
-      steady, high means it has swung around and today's number tells you little. "Outlier" is
-      DefiLlama's own flag for figures it considers unreliable.</p>
+      <p class="fineprint"><strong>Conf.</strong> is how much the figure can be trusted, not how
+      good the pool is — scored on days of history, the volatility of the APY itself, how far
+      today sits from the pool's own 30-day mean, and how much is emissions. A trustworthy 4%
+      scores higher than a suspect 400%, which is the point. Hover it for the weakest signal.
+      <strong>V/R</strong> is daily volume over reserves, the metric the OTS notes call the most
+      important one for picking a pool; 0.25 is the benchmark and anything over about 5 is usually
+      looped volume rather than a genuinely busy pool. It is blank for single-sided pools, which
+      have no swaps.</p>
     </section>
 
     <section class="card">

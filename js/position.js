@@ -115,6 +115,19 @@ LP.position = (function () {
     const entryPrice = pos.entryPrice > 0 ? pos.entryPrice : priceNow;
     const ratio = priceNow / entryPrice;
 
+    /*
+     * Sanity-check the entry price before trusting it.
+     *
+     * A pool's price is quoted as base-in-quote, and which token is "base" is the data
+     * source's choice -- a WETH/USDC pool may be indexed as USDC/WETH, where the price is
+     * 0.00037 rather than 2700. Entering the number the wrong way round (or in the wrong
+     * units) produces a price ratio off by orders of magnitude, and the IL formula happily
+     * returns -100% for it. That reads as a real answer and is the most dangerous kind of
+     * wrong, so it is flagged rather than computed.
+     */
+    const plausible = entryPrice > 0 && priceNow > 0
+      ? Math.abs(Math.log(entryPrice / priceNow)) <= Math.log(20) : false;
+
     const idx = entryIndex(bars, pos.entryDate);
     const slice = idx >= 0 ? bars.slice(idx) : [];
     const daysHeld = slice.length
@@ -157,7 +170,9 @@ LP.position = (function () {
 
     return {
       entryPrice, priceNow, ratio, movePct: (ratio - 1) * 100,
-      daysHeld, replayed,
+      daysHeld, replayed, plausible,
+      // Spelled out so the UI can say which way round it should be.
+      suggestedInverse: plausible ? null : (priceNow > 0 ? 1 / entryPrice : null),
       feesPct, ilPct, netPct, inRangePct, inRangeNow,
       feesUsd: feesPct === null ? null : (feesPct / 100) * pos.sizeUsd,
       ilUsd: ilPct === null ? null : (ilPct / 100) * pos.sizeUsd,
@@ -224,12 +239,28 @@ LP.position = (function () {
   function renderSummary(r, pos, perf) {
     const u = U();
     const good = perf.netPct >= 0;
+    const unitWarning = perf.plausible ? '' : `
+      <div class="callout warn">
+        <strong>That entry price looks wrong.</strong> You entered
+        ${u.price(perf.entryPrice)} but this pool currently trades at
+        ${u.price(perf.priceNow)} ${esc(r.pool.quoteSymbol || '')} per
+        ${esc(r.pool.baseSymbol || '')} — a difference of orders of magnitude. The usual cause
+        is entering the price the other way round: this pool is indexed as
+        <strong>${esc(r.pool.baseSymbol || 'base')} / ${esc(r.pool.quoteSymbol || 'quote')}</strong>,
+        so the price is how many ${esc(r.pool.quoteSymbol || 'quote')} one
+        ${esc(r.pool.baseSymbol || 'base')} costs.
+        ${perf.suggestedInverse ? 'Did you mean <strong>' + u.price(perf.suggestedInverse) +
+          '</strong>?' : ''}
+        Everything below is computed from what you entered, so treat it as meaningless until
+        this is fixed.
+      </div>`;
     const rangeLine = perf.bounds
       ? u.price(perf.bounds.lo) + ' – ' + u.price(perf.bounds.hi) +
         (perf.inRangeNow ? '' : ' · <strong class="down">out of range</strong>')
       : 'full range';
 
     return `
+      ${unitWarning}
       <div class="pos-head">
         <div>
           <div class="pos-size">${u.usd(pos.sizeUsd)}</div>

@@ -222,4 +222,28 @@ check('stats without a bars array does not throw',
 check('evaluate survives those params',
   Number.isFinite(LP.model.evaluate(LP.model.paramsFrom({})).netPct));
 
+/*
+ * An entry price in the wrong units is the most dangerous kind of wrong: the IL formula
+ * returns a confident -100% and it reads like a real answer. Found by seeding the book with
+ * a WETH/USDC price for a pool the data source indexes as USDC/WETH.
+ */
+suite('position entry-price sanity');
+const sane = LP.position.performance(baseResult, pos);
+check('a sensible entry price is accepted', sane.plausible === true);
+
+const inverted = Object.assign({}, pos, { entryPrice: 1 / pos.entryPrice });
+const invPerf = LP.position.performance(baseResult, inverted);
+check('an inverted entry price is flagged', invPerf.plausible === false);
+check('and the inverse is suggested back',
+  Math.abs(invPerf.suggestedInverse - pos.entryPrice) < pos.entryPrice * 1e-6);
+
+const wrongUnits = Object.assign({}, pos, { entryPrice: pos.entryPrice * 10000 });
+check('wrong units are flagged', LP.position.performance(baseResult, wrongUnits).plausible === false);
+check('a 10x move is still considered plausible',
+  LP.position.performance(baseResult,
+    Object.assign({}, pos, { entryPrice: pos.entryPrice * 10 })).plausible === true);
+check('a 25x move is not',
+  LP.position.performance(baseResult,
+    Object.assign({}, pos, { entryPrice: pos.entryPrice * 25 })).plausible === false);
+
 report();

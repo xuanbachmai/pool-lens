@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your book — every LP position at once</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="nav">
+      <span class="here">Your book</span>
+      <a href="index.html">→ analyse a pool</a>
+      <a href="farm.html">→ farm screener</a>
+      <a href="amm.html">→ how the AMM formula works</a>
+    </div>
+    <h1>Your book</h1>
+    <p>Every position you've saved, in one place. The rest of this app reasons about one pool at
+    a time; a book asks different questions — which position needs attention first, how much of
+    your capital is sitting out of range earning nothing, and whether five positions are really
+    one bet wearing five hats.</p>
+  </header>
+
+  <main id="pfBody"></main>
+
+  <p class="fineprint" style="margin-top:32px">Positions are read from this browser's local
+  storage, the same place the analyser saves them — nothing is uploaded and nothing is shared
+  between devices. Each position costs one pool lookup plus its price history, so a large book
+  takes a few seconds to load and can hit the data source's free-tier rate limit.</p>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/parse.js"></script>
+<script src="js/fees.js"></script>
+<script src="js/api.js"></script>
+<script src="js/backtest.js"></script>
+<script src="js/swap.js"></script>
+<script src="js/model.js"></script>
+<script src="js/analyze.js"></script>
+<script src="js/execution.js"></script>
+<script src="js/position.js"></script>
+<script src="js/strategy.js"></script>
+<script src="js/portfolio.js"></script>
+</body>
+</html>
