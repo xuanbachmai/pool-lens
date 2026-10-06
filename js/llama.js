@@ -24,18 +24,30 @@ LP.llama = (function () {
   let shaped = null;       // the same rows normalised, built once (see rows())
   let inflight = null;     // de-dupe concurrent callers
 
-  /** GeckoTerminal network id -> DefiLlama chain name. */
+  /*
+   * GeckoTerminal network id -> DefiLlama chain NAME.
+   *
+   * These are a third party's display strings, so they drift and they are not guessable:
+   * Optimism is listed as "OP Mainnet", zkSync as "ZKsync Era" with a capital K, World Chain
+   * with a space. A wrong string here fails silently -- the pool reports "not tracked" and the
+   * emissions panel stays empty, which reads as missing data rather than a bug. Four of these
+   * were wrong until a test compared every value against the live chain list; that test now
+   * guards them (test/llama.test.mjs, "chain mappings match the live data").
+   */
   const CHAINS = {
-    eth: 'Ethereum', arbitrum: 'Arbitrum', optimism: 'Optimism', base: 'Base',
+    eth: 'Ethereum', arbitrum: 'Arbitrum', optimism: 'OP Mainnet', base: 'Base',
     polygon_pos: 'Polygon', bsc: 'BSC', avax: 'Avalanche', ftm: 'Fantom',
     xdai: 'Gnosis', celo: 'Celo', glmr: 'Moonbeam', cro: 'Cronos', metis: 'Metis',
-    aurora: 'Aurora', zksync: 'zkSync Era', linea: 'Linea', scroll: 'Scroll',
+    aurora: 'Aurora', zksync: 'ZKsync Era', linea: 'Linea', scroll: 'Scroll',
     blast: 'Blast', mantle: 'Mantle', mode: 'Mode', sonic: 'Sonic',
     berachain: 'Berachain', hyperevm: 'Hyperliquid L1', unichain: 'Unichain',
-    ink: 'Ink', taiko: 'Taiko', 'zora-network': 'Zora', 'world-chain': 'WorldChain',
+    monad: 'Monad', ink: 'Ink', taiko: 'Taiko', 'zora-network': 'Zora',
+    'world-chain': 'World Chain',
     soneium: 'Soneium', fraxtal: 'Fraxtal', kava: 'Kava', ronin: 'Ronin',
     solana: 'Solana', 'sui-network': 'Sui', aptos: 'Aptos', 'sei-v2': 'Sei',
-    'polygon-zkevm': 'Polygon zkEVM', tron: 'Tron', pulsechain: 'PulseChain'
+    'polygon-zkevm': 'Polygon zkEVM', tron: 'Tron', pulsechain: 'PulseChain',
+    osmosis: 'Osmosis', starknet: 'Starknet', ton: 'TON', flare: 'Flare',
+    katana: 'Katana', plasma: 'Plasma', abstract: 'Abstract'
   };
 
   const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');

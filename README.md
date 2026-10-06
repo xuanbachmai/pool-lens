@@ -429,6 +429,47 @@ the JS filenames aren't content-hashed, so this is what stops a browser serving 
 after a deploy. It also sets a CSP that allows scripts only from this origin and network calls
 only to the two data APIs.
 
+## Chain coverage
+
+Four separate lists, because they answer different questions:
+
+| | Count |
+| --- | --- |
+| URL aliases accepted (`ethereum`, `eth`, `mainnet`, `arb`…) | 70 |
+| Distinct networks those resolve to | 43 |
+| Numeric `chainId` values recognised (`?chainId=42161`) | 25 |
+| DefiLlama chain mappings, for emissions and the screener | 47 |
+| Chains with a gas estimate, for minimum viable size | 28 |
+| **Distinct chains named anywhere in the codebase** | **44** |
+
+Two ceilings sit above those. The **analyser** works on any pool GeckoTerminal indexes — 100+
+networks — because an unrecognised chain just falls back to resolving by address instead of by
+name. The **screener** shows whatever DefiLlama returns, currently **104 chains**, regardless of
+whether we have a mapping for them; the mapping only matters for tying a screener row back to an
+analysed pool.
+
+Chains without a gas estimate fall back to a flat $5 round trip rather than zero, which is
+deliberate — an unknown chain should read as "probably cheap, but check" and not as free.
+
+### A silent failure worth knowing about
+
+Chain mappings are a third party's display strings. They drift, and a wrong one fails *silently*:
+the pool reports "not tracked", the emissions panel stays empty, and that is indistinguishable
+from a chain that genuinely has no pools. Four were wrong, found by comparing every mapping
+against the live chain list:
+
+| We sent | DefiLlama actually uses | Pools affected |
+| --- | --- | --- |
+| `Optimism` | **`OP Mainnet`** | 435 |
+| `zkSync Era` | **`ZKsync Era`** | 10 |
+| `WorldChain` | **`World Chain`** | 1 |
+| *(no mapping)* | **`Monad`** | 260 |
+
+Emissions never resolved for a single Optimism pool. Mappings resolving against the data went
+from 30/39 to 34/47, and 96% of the sampled set is now reachable. A test asserts that no mapping
+differs from a real chain name by case or punctuation alone — which catches a typo while still
+tolerating a chain that legitimately has no pools this month.
+
 ## Data sources
 
 - [GeckoTerminal](https://api.geckoterminal.com/api/v2) — pool state, fee tier, daily OHLCV.

@@ -125,4 +125,48 @@ check('sorted by pool count descending',
 check('counts sum to the dataset size',
   chains.reduce((a, c) => a + c.n, 0) === L.count());
 
+/*
+ * Chain-name mappings are the most fragile thing in this client: they are a third party's
+ * display strings, and a wrong one fails SILENTLY -- the pool reports "not tracked" and the
+ * emissions panel stays empty, indistinguishable from a chain that genuinely has no pools.
+ *
+ * Four were wrong before this test existed. The worst was Optimism, which DefiLlama lists as
+ * "OP Mainnet": emissions never resolved for any Optimism pool, and the 435 of them in the
+ * dataset were simply invisible.
+ *
+ * The check that catches this class without failing on chains that legitimately have no pools
+ * right now: a mapped name must not differ from a real chain name by case or punctuation
+ * alone. "zkSync Era" against "ZKsync Era" is a typo; "Blast" against nothing is just a quiet
+ * month.
+ */
+suite('llama chain mappings match the live data');
+const realNames = new Set(L.chains().map((c) => c.chain));
+const normalise = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, '');
+const realByNorm = new Map();
+realNames.forEach((n) => realByNorm.set(normalise(n), n));
+
+const nearMisses = [];
+const exact = [];
+for (const [gt, name] of Object.entries(L.CHAINS)) {
+  if (realNames.has(name)) { exact.push(gt); continue; }
+  const hit = realByNorm.get(normalise(name));
+  if (hit) nearMisses.push(gt + ': we send "' + name + '", data has "' + hit + '"');
+}
+check('no mapping differs from a real chain name by case or punctuation only',
+  nearMisses.length === 0, nearMisses.join('; '));
+check('a healthy share of mappings resolve against the data',
+  exact.length >= 20, exact.length + ' of ' + Object.keys(L.CHAINS).length + ' resolve');
+
+check('Optimism maps to the name DefiLlama actually uses',
+  realNames.has(L.CHAINS.optimism), 'sends "' + L.CHAINS.optimism + '"');
+check('the chains with the most pools are all mapped',
+  (() => {
+    const mapped = new Set(Object.values(L.CHAINS));
+    const top = L.chains().slice(0, 8).filter((c) => !mapped.has(c.chain));
+    return top.length === 0 || (nearMisses.length === 0 && top.every((c) => c.n < 200));
+  })(),
+  'unmapped in the top 8: ' + L.chains().slice(0, 8)
+    .filter((c) => !new Set(Object.values(L.CHAINS)).has(c.chain))
+    .map((c) => c.chain + ' (' + c.n + ')').join(', '));
+
 report();
