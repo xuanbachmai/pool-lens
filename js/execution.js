@@ -12,7 +12,7 @@ LP.execution = (function () {
   const U = () => LP.util;
   const esc = (s) => LP.util.escapeHtml(s);
 
-  const local = { arriveWith: 'quote', result: null };
+  const local = { arriveWith: 'quote', result: null, gasUsd: null, horizonDays: 30 };
 
   function ctx(r) {
     const built = LP.swap.poolFrom(r);
@@ -65,6 +65,7 @@ LP.execution = (function () {
       ${renderDepth(c)}
       <h4>Price impact by trade size</h4>
       ${renderImpactChart(c)}
+      ${renderMinSize(r, c)}
       ${renderArbBand(c)}`);
   }
 
@@ -255,6 +256,111 @@ LP.execution = (function () {
       slippage takes over and grows without bound.</p>`;
   }
 
+  /**
+   * The smallest position worth opening here.
+   *
+   * Gas is fixed and swap cost is proportional, so total cost as a share of the position is
+   * U-shaped -- ruinous when small because gas dominates, ruinous when large because slippage
+   * does. Both ends matter and neither is visible on a DEX front-end.
+   */
+  function renderMinSize(r, c) {
+    const u = U();
+    const network = r.pool.network;
+    const gasUsd = local.gasUsd === null ? LP.swap.gasFor(network) : local.gasUsd;
+    const dailyYield = c.dailyFeeYield > 0 ? c.dailyFeeYield : 0;
+    const ms = LP.swap.minViableSize(c.pool, c.fee, dailyYield, {
+      network, gasUsd, baseFraction: c.baseFrac, maxDays: local.horizonDays
+    });
+    if (!ms) return '';
+
+    const yours = ms.points.reduce((a, b) =>
+      Math.abs(b.usd - c.positionUsd) < Math.abs(a.usd - c.positionUsd) ? b : a);
+
+    const ladder = [100, 500, 2500, 10000, 50000, 250000]
+      .filter((t) => t <= ms.poolUsd * 0.2)
+      .map((t) => ms.points.reduce((a, b) =>
+        Math.abs(b.usd - t) < Math.abs(a.usd - t) ? b : a));
+
+    const rows = ladder.map((p) => `
+      <tr class="${Math.abs(p.usd - yours.usd) < 1 ? 'here' : ''}">
+        <td class="num">${u.usd(p.usd)}</td>
+        <td class="num">${u.pct(p.gasPct, 2)}</td>
+        <td class="num">${u.pct(p.swapPct, 3)}</td>
+        <td class="num down">${u.pct(p.totalPct, 2)}</td>
+        <td class="num">${p.paybackDays === null ? '—'
+          : p.paybackDays > 3650 ? 'never'
+          : u.ratio(p.paybackDays, p.paybackDays > 10 ? 0 : 1) + ' days'}</td>
+      </tr>`).join('');
+
+    const floorTooBig = ms.floor && ms.floor.usd > c.positionUsd;
+
+    return `
+      <h4>Is your position big enough to bother?</h4>
+      <p class="muted">Gas does not care how much you deposit, so on a small position it is the
+      whole cost — and swap slippage takes over again on a large one. That makes the cost of
+      getting in and out U-shaped, with a real floor underneath which the position cannot repay
+      its own entry and exit.</p>
+
+      <div class="exec-ctl exec-ctl-row">
+        <label>Round-trip gas (USD)
+          <input type="number" id="execGas" min="0" step="0.1" value="${gasUsd}">
+          <em>default for ${esc(network)}; four transactions in and out</em>
+        </label>
+        <label>Payback horizon
+          <select id="execHorizon">
+            ${[7, 30, 90, 365].map((d) => '<option value="' + d + '"' +
+              (d === local.horizonDays ? ' selected' : '') + '>' + d + ' days</option>').join('')}
+          </select>
+        </label>
+      </div>
+
+      <div class="metrics">
+        ${metric('Smallest worth opening',
+          ms.floor ? u.usd(ms.floor.usd) : 'no size qualifies',
+          ms.floor ? 'repays its costs within ' + local.horizonDays + ' days'
+            : ms.fastest
+              ? 'the fastest this pool can repay a round trip is ' +
+                u.ratio(ms.fastest.paybackDays, 0) + ' days, at ' + u.usd(ms.fastest.usd)
+              : 'this pool earns no measurable fees',
+          ms.floor ? '' : 'weak')}
+        ${metric('Cheapest size', u.usd(ms.best.usd),
+          u.pct(ms.best.totalPct, 2) + ' all-in — gas and slippage balance here')}
+        ${metric('Your ' + u.usd(c.positionUsd), u.pct(yours.totalPct, 2),
+          'of which gas is ' + u.pct(yours.gasPct, 2) + ' · payback ' +
+          (yours.paybackDays === null ? 'n/a' : yours.paybackDays > 3650 ? 'never'
+            : u.ratio(yours.paybackDays, 0) + ' days'),
+          floorTooBig ? 'weak' : 'good')}
+      </div>
+
+      ${!ms.floor && ms.fastest ? `<div class="callout warn">
+        <strong>No position size repays its own costs here within ${local.horizonDays} days.</strong>
+        The best this pool can do is ${u.ratio(ms.fastest.paybackDays, 0)} days at
+        ${u.usd(ms.fastest.usd)} — small positions are eaten by gas, large ones by slippage, and
+        the fee rate in between is too thin to cover either quickly. That is a verdict on the
+        pool, not on your sizing: raise the horizon to see where it does clear.
+      </div>` : ''}
+
+      ${floorTooBig ? `<div class="callout warn">
+        <strong>Your position is below the floor for this pool.</strong>
+        At ${u.usd(c.positionUsd)} the round trip costs ${u.pct(yours.totalPct, 2)}, of which
+        ${u.pct(yours.gasPct, 2)} is gas alone, and it would take
+        ${yours.paybackDays > 3650 ? 'longer than ten years' : u.ratio(yours.paybackDays, 0) + ' days'}
+        of fees to earn back. On ${esc(network)} a position needs to be around
+        ${u.usd(ms.floor.usd)} before the costs stop dominating the return.
+      </div>` : ''}
+
+      <div class="table-scroll"><table>
+        <thead><tr><th class="num">Position</th><th class="num">Gas</th>
+          <th class="num">Fee + slippage</th><th class="num">All-in</th>
+          <th class="num">Fees to repay it</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <p class="fineprint">Gas is a rough per-chain default for four transactions — two swaps plus
+      an add and a remove — and moves with the network, so edit it if you know better. The spread
+      between chains is what matters: the same position that is unviable on Ethereum is fine on an
+      L2, and this is the calculation that says where the line falls.</p>`;
+  }
+
   function renderArbBand(c) {
     const u = U();
     const mid = c.pool.quote / c.pool.base;
@@ -286,19 +392,27 @@ LP.execution = (function () {
   }
 
   function wire() {
-    const sel = document.getElementById('execArrive');
-    if (!sel) return;
-    sel.addEventListener('change', () => {
-      local.arriveWith = sel.value;
+    const redraw = () => {
       const sec = document.querySelector('.card.execution');
-      if (sec && local.result) {
-        sec.outerHTML = render(local.result);
-        wire();
-      }
+      if (sec && local.result) { sec.outerHTML = render(local.result); wire(); }
+    };
+
+    const sel = document.getElementById('execArrive');
+    if (sel) sel.addEventListener('change', () => { local.arriveWith = sel.value; redraw(); });
+
+    const gas = document.getElementById('execGas');
+    if (gas) gas.addEventListener('change', () => {
+      const v = parseFloat(gas.value);
+      if (Number.isFinite(v) && v >= 0) { local.gasUsd = v; redraw(); }
+    });
+
+    const hz = document.getElementById('execHorizon');
+    if (hz) hz.addEventListener('change', () => {
+      local.horizonDays = +hz.value; redraw();
     });
   }
 
-  function reset() { local.arriveWith = 'quote'; }
+  function reset() { local.arriveWith = 'quote'; local.gasUsd = null; local.horizonDays = 30; }
 
   return { render, wire, reset, ctx };
 })();

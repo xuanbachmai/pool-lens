@@ -131,6 +131,47 @@ LP.analyze = (function () {
     };
   }
 
+  /**
+   * Is this pool's volume growing or draining?
+   *
+   * Pools die quietly. Fee APR is computed from recent volume, so a pool whose trading has
+   * halved still advertises yesterday's yield right up until someone looks. Comparing the last
+   * week against the month before it catches that while there is still time to leave.
+   *
+   * Medians, not means: one wash-trading day or one airdrop farm can double a mean and invent
+   * a trend that is not there.
+   */
+  function volumeTrend(bars) {
+    if (!bars || bars.length < 21) return null;
+    const vol = bars.map((b) => (b.v > 0 ? b.v : 0));
+    const recent = vol.slice(-7);
+    const prior = vol.slice(-35, -7);
+    if (prior.length < 14) return null;
+
+    const median = (xs) => {
+      const s = xs.slice().sort((a, b) => a - b);
+      const m = Math.floor(s.length / 2);
+      return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+    };
+    const now = median(recent);
+    const before = median(prior);
+    if (!(before > 0)) return null;
+
+    const ratio = now / before;
+    // Named states rather than a bare number, because the action differs at each.
+    const state = ratio < 0.4 ? 'collapsing'
+      : ratio < 0.7 ? 'draining'
+      : ratio > 1.5 ? 'growing' : 'steady';
+
+    return {
+      recentMedian: now,
+      priorMedian: before,
+      ratio,
+      changePct: (ratio - 1) * 100,
+      state
+    };
+  }
+
   /** Pair regime from the volatility of the base/quote ratio itself. */
   function regime(volAnnual) {
     if (volAnnual === null || volAnnual === undefined) return { key: 'unknown', label: 'Unknown' };
@@ -257,7 +298,8 @@ LP.analyze = (function () {
     if (range && range.backtest) rangeScore = LP.util.clamp(range.backtest.pctTimeInRange, 0, 100);
 
     /* --- Risk flags ------------------------------------------------------ */
-    const flags = buildFlags({ pool, cross: ctx.cross, feeInfo, stats, vr24, vr3d, tvl });
+    const trend = stats ? volumeTrend(stats.bars) : null;
+    const flags = buildFlags({ pool, cross: ctx.cross, feeInfo, stats, vr24, vr3d, tvl, trend });
 
     /* --- Overall verdict ------------------------------------------------- */
     const parts = [];
@@ -287,6 +329,7 @@ LP.analyze = (function () {
     return {
       pool, cross: ctx.cross, feeInfo, assumptions: a, stats,
       regime: regime(stats ? stats.volAnnual : null),
+      volumeTrend: trend,
       poolType: feeInfo.type,
       isCl,
       vr: { h24: vr24, h6x4: vr6x4, d3: vr3d, benchmark: vrBenchmark, score: vrScore },
@@ -309,7 +352,7 @@ LP.analyze = (function () {
   }
 
   function buildFlags(o) {
-    const { pool, cross, feeInfo, stats, vr24, vr3d, tvl } = o;
+    const { pool, cross, feeInfo, stats, vr24, vr3d, tvl, trend } = o;
     const flags = [];
     const add = (level, title, detail) => flags.push({ level, title, detail });
 
@@ -386,6 +429,27 @@ LP.analyze = (function () {
       }
     }
 
+    if (trend && (trend.state === 'collapsing' || trend.state === 'draining')) {
+      const collapsing = trend.state === 'collapsing';
+      add(collapsing ? 'critical' : 'warn',
+        collapsing ? 'Volume is collapsing' : 'Volume is draining away',
+        'Median daily volume over the last week is ' + LP.util.usd(trend.recentMedian) +
+        ' against ' + LP.util.usd(trend.priorMedian) + ' over the month before \u2014 ' +
+        LP.util.signedPct(trend.changePct, 0) + '. Every fee figure on this page is annualised ' +
+        'from recent volume, so they describe a pool that is busier than this one now is. ' +
+        (collapsing
+          ? 'At this rate the fee income the analysis assumes will not be there.'
+          : 'Worth checking why before adding to it.'));
+    }
+
+    if (trend && trend.state === 'growing') {
+      add('info', 'Volume is growing',
+        'Median daily volume is up ' + LP.util.signedPct(trend.changePct, 0) +
+        ' on the month before (' + LP.util.usd(trend.priorMedian) + ' to ' +
+        LP.util.usd(trend.recentMedian) + '). The fee figures here may understate a pool that ' +
+        'is still picking up \u2014 though new liquidity usually follows volume and dilutes it back.');
+    }
+
     if (feeInfo.confidence === 'assumed') {
       add('warn', 'Swap fee was assumed, not read',
         'The fee tier could not be read from the data source, so 0.30% is assumed. Fee APR scales ' +
@@ -430,5 +494,6 @@ LP.analyze = (function () {
     return flags;
   }
 
-  return { run, ilV2, ilCl, clValue, capitalEfficiency, breakevenDivergence, historyStats, regime, grade };
+  return { run, ilV2, ilCl, clValue, capitalEfficiency, breakevenDivergence, historyStats,
+           volumeTrend, regime, grade };
 })();

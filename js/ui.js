@@ -345,6 +345,11 @@ LP.ui = (function () {
         ${metric('Liquidity (TVL)', U.usd(p.tvlUsd), r.cross && r.cross.tvlUsd !== null
             ? 'DexScreener: ' + U.usd(r.cross.tvlUsd) : 'single source')}
         ${metric('Volume 24h', U.usd(p.volume.h24), '6h &times;4: ' + U.usd((p.volume.h6 || 0) * 4))}
+        ${r.volumeTrend ? metric('Volume trend',
+            U.signedPct(r.volumeTrend.changePct, 0),
+            'last 7 days vs the month before, by median · ' + esc(r.volumeTrend.state),
+            r.volumeTrend.state === 'collapsing' || r.volumeTrend.state === 'draining'
+              ? 'weak' : r.volumeTrend.state === 'growing' ? 'good' : '') : ''}
         ${metric('V/R ratio 24h', U.ratio(r.vr.h24), 'benchmark 0.25 · 3-day: ' + U.ratio(r.vr.d3), vrCls)}
         ${metric('Fee APR (swap fees only)', r.fees.aprFullRange === null ? '—' : U.pct(r.fees.aprFullRange, 1),
             'at ' + U.pct(r.fees.feePct, 2) + ' fee, LP keeps ' + U.pct(r.fees.lpShare * 100, 0))}

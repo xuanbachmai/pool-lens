@@ -54,9 +54,11 @@ LP.screener = (function () {
       state.loaded = true;
       status.textContent = '';
       buildChainFilter();
+      const fromLink = readHash();
       const slot = document.getElementById('askSlot');
       if (slot && window.LP.ask) { slot.innerHTML = LP.ask.render(); LP.ask.wire(); }
       wire();
+      if (fromLink) syncControls();
       draw();
     } catch (e) {
       state.error = e.message || String(e);
@@ -71,6 +73,70 @@ LP.screener = (function () {
     sel.innerHTML = '<option value="any">Any chain</option>' +
       chains.map((c) => '<option value="' + esc(c.chain) + '">' + esc(c.chain) +
         ' (' + c.n + ')</option>').join('');
+  }
+
+  /* ------------------------------------------------------------------ sharing */
+
+  /*
+   * Filters live in the URL hash so a screen can be bookmarked or sent to someone. Short keys
+   * keep it readable; only values that differ from the default are written, so a link carries
+   * the intent rather than the whole state.
+   */
+  const SHARE_KEYS = {
+    e: 'exposure', c: 'chain', s: 'sort', q: 'search',
+    tvl: 'minTvl', apy: 'minApy', rw: 'maxRewardShare',
+    cf: 'minConfidence', vrn: 'minVr', vrx: 'maxVr',
+    st: 'stablecoin', nil: 'noIlRisk', ox: 'excludeOutliers', n: 'limit'
+  };
+  const DEFAULTS = {
+    exposure: 'any', chain: 'any', sort: 'base', search: '',
+    minTvl: 1e6, minApy: 0, maxRewardShare: null,
+    minConfidence: 0, minVr: 0, maxVr: 0,
+    stablecoin: false, noIlRisk: false, excludeOutliers: true, limit: 60
+  };
+
+  function writeHash() {
+    const parts = [];
+    for (const [short, key] of Object.entries(SHARE_KEYS)) {
+      const v = state[key];
+      const d = DEFAULTS[key];
+      if (v === d) continue;
+      if (v === null || v === undefined || v === '') continue;
+      parts.push(short + '=' + encodeURIComponent(
+        typeof v === 'boolean' ? (v ? 1 : 0) : v));
+    }
+    const hash = parts.join('&');
+    // replaceState, not assignment: a filter tweak should not add a history entry per keystroke.
+    try {
+      history.replaceState(null, '', hash ? '#' + hash : location.pathname + location.search);
+    } catch (e) { /* some embedded contexts disallow it; the filters still work */ }
+  }
+
+  function readHash() {
+    const raw = String(location.hash || '').replace(/^#/, '');
+    if (!raw) return false;
+    let touched = false;
+    for (const pair of raw.split('&')) {
+      const [short, rawVal] = pair.split('=');
+      const key = SHARE_KEYS[short];
+      if (!key || rawVal === undefined) continue;
+      const val = decodeURIComponent(rawVal);
+      const d = DEFAULTS[key];
+      if (typeof d === 'boolean') state[key] = val === '1' || val === 'true';
+      else if (typeof d === 'number' || d === null) {
+        const n = parseFloat(val);
+        if (Number.isFinite(n)) state[key] = n;
+      } else {
+        state[key] = val;
+      }
+      touched = true;
+    }
+    return touched;
+  }
+
+  function shareLink() {
+    writeHash();
+    return location.href;
   }
 
   /* ------------------------------------------------------------------- render */
@@ -88,6 +154,7 @@ LP.screener = (function () {
 
     $('scCount').textContent = rows.length.toLocaleString('en-US');
     $('scTotal').textContent = LP.llama.count().toLocaleString('en-US');
+    writeHash();
 
     if (!rows.length) {
       $('scBody').innerHTML = '';
@@ -258,6 +325,21 @@ LP.screener = (function () {
     }));
     // The OTS notes' ideal setup: heavily traded relative to its own size, with the
     // implausible readings that are really wash volume excluded.
+    on('scShare', 'click', async () => {
+      const btn = $('scShare');
+      const link = shareLink();
+      try {
+        await navigator.clipboard.writeText(link);
+        btn.textContent = 'Link copied';
+      } catch (e) {
+        // Clipboard access is denied in plenty of contexts; the URL bar already holds it.
+        btn.textContent = 'Link is in the address bar';
+      }
+      setTimeout(() => { btn.textContent = 'Copy link to this screen'; }, 2200);
+    });
+
+    on('scCsv', 'click', () => exportCsv());
+
     on('scPresetTurnover', 'click', () => applyPreset({
       exposure: 'multi', stablecoin: false, noIlRisk: false, minTvl: 2e6, minApy: 0,
       maxRewardShare: null, sort: 'vr', excludeOutliers: true, chain: 'any', search: '',
@@ -299,7 +381,40 @@ LP.screener = (function () {
     draw();
   }
 
-  return { init, draw, syncControls, state };
+  /** Export the rows currently matched, with the derived columns, as CSV. */
+  function exportCsv() {
+    const rows = LP.llama.screen(Object.assign({}, state, { limit: null }));
+    const head = ['symbol', 'project', 'chain', 'meta', 'exposure', 'apy', 'apyBase',
+      'apyReward', 'emissionsShare', 'confidence', 'vr', 'tvlUsd', 'sigma', 'days',
+      'stablecoin', 'ilRisk', 'outlier'];
+    const cell = (v) => {
+      if (v === null || v === undefined) return '';
+      const s = String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const lines = [head.join(',')];
+    for (const p of rows) {
+      const share = LP.llama.rewardShare(p);
+      lines.push([p.symbol, p.project, p.chain, p.meta, p.exposure,
+        p.apy, p.apyBase, p.apyReward,
+        share === null ? '' : share.toFixed(4),
+        p.confidence === null ? '' : Math.round(p.confidence),
+        p.vr === null ? '' : p.vr.toFixed(4),
+        Math.round(p.tvlUsd), p.sigma, p.count,
+        p.stablecoin ? 'yes' : 'no', p.ilRisk, p.outlier ? 'yes' : 'no'
+      ].map(cell).join(','));
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'pool-lens-screen-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  return { init, draw, syncControls, exportCsv, shareLink, state };
 })();
 
 document.addEventListener('DOMContentLoaded', LP.screener.init);

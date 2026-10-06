@@ -270,6 +270,47 @@ It is blank, not zero, for single-sided pools: a lending vault has no swaps, and
 "none" are different claims. Anything above about 5x is usually looped or wash volume rather than
 a genuinely busy pool, so the presets cap it there — `CDT-OSMO` at V/R 858 is not a find.
 
+## Is your position big enough to bother?
+
+Gas does not care how much you deposit. Swap cost is proportional and slippage grows faster than
+linearly, so cost as a share of the position is **U-shaped** — ruinous when small because gas is
+the whole bill, ruinous when large because slippage is. Both ends matter and neither appears on a
+DEX front-end.
+
+On a $20M pool at 0.05%, charging Ethereum gas for four transactions:
+
+| Position | Gas | Fee + slippage | All-in | Fees to repay |
+| --- | --- | --- | --- | --- |
+| $99 | 60.57% | 0.05% | **60.62%** | 758 days |
+| $2,009 | 2.99% | 0.06% | 3.05% | 38 days |
+| $47,039 | 0.13% | 0.29% | **0.41%** | 5 days |
+| $954,133 | 0.01% | 4.71% | **4.71%** | 59 days |
+
+The same economics on a cheaper chain move the floor by two orders of magnitude — cheapest size
+$35,316 on Ethereum against $638 on Solana. When no size repays inside the chosen horizon, the
+panel says so and reports the fastest payback the pool can manage, because "no size works" is a
+verdict on the pool rather than on your sizing.
+
+Gas is a rough per-chain default and editable; the spread between chains is the part that matters.
+
+## Is the pool dying?
+
+Pools die quietly. Fee APR is annualised from recent volume, so a pool whose trading has halved
+keeps advertising yesterday's yield until someone looks. The analyser compares the **median** daily
+volume of the last week against the month before it — medians, because one wash-trading day or one
+airdrop farm can double a mean and invent a trend that is not there.
+
+Four states: collapsing (under 0.4x), draining (under 0.7x), steady, growing (over 1.5x).
+Collapsing is a critical flag; draining is a warning. Verified against synthetic series, including
+the case that matters — a single 50x volume spike still reads as *steady*.
+
+## Sharing a screen
+
+Filters live in the URL hash, short keys, defaults omitted:
+`farm.html#s=confidence&tvl=5000000&apy=6&cf=70`. Bookmark it or send it; it restores every filter
+and reproduces the same result count. There's a CSV export of exactly the rows on screen, derived
+columns included.
+
 ## Your book
 
 Every page before this reasoned about one pool. A book asks different questions, and `book.html`

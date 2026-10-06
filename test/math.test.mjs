@@ -167,4 +167,42 @@ check('sweep covers every width without dropping any', sweep.length === 7);
 check('efficiency falls as the range widens',
   sweep.every((s, i) => i === 0 || s.efficiency < sweep[i - 1].efficiency));
 
+/*
+ * Minimum viable position size. Gas is fixed and swap cost is proportional, so cost as a share
+ * of the position is U-shaped -- ruinous when small because gas dominates, ruinous when large
+ * because slippage does. Both ends matter and neither shows on a DEX front-end.
+ */
+suite('swap.minViableSize');
+const big = { base: 3700, quote: 10e6, baseUsd: 2700, quoteUsd: 1 };   // ~$20M pool
+const ms = S.minViableSize(big, 0.0005, 0.0008, { network: 'eth', maxDays: 30 });
+check('returns a curve', ms.points.length > 20);
+check('gas default for ethereum is the dearest', S.gasFor('eth') > S.gasFor('base'));
+check('an unknown chain gets a cost, not zero', S.gasFor('nonesuch') > 0);
+
+check('cost is U-shaped: the cheapest size is interior, not an endpoint',
+  ms.best.usd > ms.points[0].usd && ms.best.usd < ms.points[ms.points.length - 1].usd,
+  'cheapest at ' + Math.round(ms.best.usd));
+check('gas dominates the small end',
+  ms.points[0].gasPct > ms.points[0].swapPct * 10);
+check('slippage dominates the large end',
+  ms.points[ms.points.length - 1].swapPct > ms.points[ms.points.length - 1].gasPct * 10);
+check('total cost falls then rises',
+  (() => {
+    const i = ms.points.indexOf(ms.best);
+    return ms.points[Math.max(0, i - 5)].totalPct > ms.best.totalPct &&
+           ms.points[Math.min(ms.points.length - 1, i + 5)].totalPct > ms.best.totalPct;
+  })());
+
+check('a cheaper chain lowers the cheapest size',
+  S.minViableSize(big, 0.0005, 0.0008, { network: 'base', maxDays: 30 }).best.usd < ms.best.usd);
+check('a floor is found when the pool pays enough',
+  S.minViableSize(big, 0.003, 0.004, { network: 'base', maxDays: 30 }).floor !== null);
+check('and the fastest payback is reported even when no floor clears',
+  (() => {
+    const poor = S.minViableSize(big, 0.0005, 0.000002, { network: 'eth', maxDays: 30 });
+    return poor.floor === null && poor.fastest !== null && poor.fastest.paybackDays > 30;
+  })());
+check('a zero-yield pool reports no payback rather than infinity',
+  S.minViableSize(big, 0.0005, 0, { network: 'eth' }).fastest === null);
+
 report();

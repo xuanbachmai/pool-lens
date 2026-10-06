@@ -208,6 +208,88 @@ LP.swap = (function () {
     return Object.assign({}, pool, { base: pool.base * k, quote: pool.quote * k });
   }
 
+  /*
+   * Typical all-in gas for opening AND closing a position: two swaps plus an add and a remove.
+   * Rough by nature -- gas moves with the network -- but the order of magnitude is what decides
+   * whether a small position is viable at all, and between chains that spans four of them.
+   */
+  const GAS_ROUND_TRIP = {
+    eth: 60, ethereum: 60,
+    arbitrum: 0.8, optimism: 0.6, base: 0.5, zksync: 0.6, linea: 0.9, scroll: 0.7,
+    blast: 0.5, mantle: 0.4, mode: 0.4, unichain: 0.5, ink: 0.4, soneium: 0.4,
+    polygon_pos: 0.1, bsc: 1.2, avax: 1.0, ftm: 0.1, sonic: 0.1, xdai: 0.05,
+    celo: 0.05, berachain: 0.4, hyperevm: 0.3, monad: 0.1,
+    solana: 0.02, 'sui-network': 0.02, aptos: 0.02, tron: 2.0
+  };
+
+  const gasFor = (network) => {
+    const g = GAS_ROUND_TRIP[String(network || '').toLowerCase()];
+    return g === undefined ? 5 : g;     // unknown chain: assume a cheap L2-ish cost, not zero
+  };
+
+  /**
+   * The smallest position worth opening.
+   *
+   * Round-trip cost has two parts that pull in opposite directions as size changes:
+   *   - fee and slippage are PROPORTIONAL (and slippage grows faster than linearly)
+   *   - gas is FIXED, so as a share of the position it explodes as the position shrinks
+   *
+   * Total cost as a percentage is therefore U-shaped, with a genuine minimum, and below some
+   * size the position cannot repay its own entry and exit inside any sensible horizon. On
+   * Ethereum that floor is high enough to rule out most retail-sized positions, which is the
+   * kind of thing that should be said before someone deposits rather than after.
+   *
+   * @param dailyYield fee yield per day as a fraction (the pool's rate for this position)
+   * @param maxDays horizon beyond which a position is treated as never paying back
+   */
+  function minViableSize(pool, fee, dailyYield, opts) {
+    const o = opts || {};
+    const gasUsd = o.gasUsd === undefined ? gasFor(o.network) : o.gasUsd;
+    const maxDays = o.maxDays || 30;
+    const baseFraction = o.baseFraction === undefined ? 0.5 : o.baseFraction;
+    const poolUsd = poolValueUsd(pool);
+    if (!(poolUsd > 0)) return null;
+
+    // Sample sizes logarithmically from $10 to a fifth of the pool.
+    const hi = Math.max(1000, poolUsd * 0.2);
+    const pts = [];
+    const N = 90;
+    for (let i = 0; i <= N; i++) {
+      const usd = 10 * Math.pow(hi / 10, i / N);
+      const rt = roundTrip(pool, usd, fee, { arriveWith: 'quote', baseFraction });
+      if (!rt || rt.exitImpossible || rt.totalLostUsd === null) continue;
+      const swapUsd = rt.totalLostUsd;
+      const totalUsd = swapUsd + gasUsd;
+      const totalPct = (totalUsd / usd) * 100;
+      const paybackDays = dailyYield > 0 ? (totalUsd / usd) / dailyYield : null;
+      pts.push({
+        usd, swapUsd, gasUsd, totalUsd, totalPct,
+        swapPct: (swapUsd / usd) * 100,
+        gasPct: (gasUsd / usd) * 100,
+        paybackDays
+      });
+    }
+    if (!pts.length) return null;
+
+    const best = pts.reduce((a, b) => (b.totalPct < a.totalPct ? b : a));
+
+    // The floor: smallest size whose payback lands inside the horizon.
+    let floor = null;
+    if (dailyYield > 0) {
+      for (const p of pts) {
+        if (p.paybackDays !== null && p.paybackDays <= maxDays) { floor = p; break; }
+      }
+    }
+
+    // The quickest payback any size can manage. When no size clears the horizon this is the
+    // number that actually answers the question.
+    const payable = pts.filter((p) => p.paybackDays !== null && Number.isFinite(p.paybackDays));
+    const fastest = payable.length
+      ? payable.reduce((a, b) => (b.paybackDays < a.paybackDays ? b : a)) : null;
+
+    return { points: pts, best, floor, fastest, gasUsd, maxDays, poolUsd, dailyYield };
+  }
+
   /** Cost of a ladder of trade sizes, for a depth table. */
   function depthTable(pool, fee, sizes) {
     const poolUsd = poolValueUsd(pool);
@@ -286,7 +368,8 @@ LP.swap = (function () {
   }
 
   return {
-    amountOut, amountIn, quote, costOfUsd, roundTrip, depthTable,
-    arbSize, baseValueFraction, curveIsValid, shrinkPool, poolValueUsd, poolFrom
+    amountOut, amountIn, quote, costOfUsd, roundTrip, depthTable, minViableSize,
+    arbSize, baseValueFraction, curveIsValid, shrinkPool, poolValueUsd, poolFrom,
+    gasFor, GAS_ROUND_TRIP
   };
 })();
