@@ -68,7 +68,155 @@ async function fetchPool(network, address) {
   };
 }
 
+/*
+ * Both of these are called directly rather than through api/merkl.js and api/pendle.js. Those
+ * proxies exist only to add a CORS header for the browser; this runs in Node, where there is no
+ * origin and no preflight, so the upstreams are reachable as they are.
+ */
+const MERKL = 'https://api.merkl.xyz/v4/opportunities';
+const PENDLE = 'https://api-v2.pendle.finance/core/v1';
+
+// Enough of the chain map for the networks a watched position is plausibly on.
+const CHAIN_IDS = {
+  eth: 1, optimism: 10, bsc: 56, unichain: 130, polygon_pos: 137, sonic: 146,
+  zksync: 324, hyperevm: 999, mantle: 5000, base: 8453, mode: 34443,
+  arbitrum: 42161, avax: 43114, linea: 59144, berachain: 80094, blast: 81457,
+  scroll: 534352, katana: 747474
+};
+
+/** Live incentive campaigns on a pool. An empty list is the normal answer, not a failure. */
+async function fetchCampaigns(network, address) {
+  const chainId = CHAIN_IDS[network];
+  if (!chainId) return [];
+  const url = `${MERKL}?identifier=${encodeURIComponent(address.toLowerCase())}&chainId=${chainId}`;
+  const res = await fetch(url, { headers: { accept: 'application/json' } });
+  if (!res.ok) throw new Error(`Merkl HTTP ${res.status}`);
+  const json = await res.json();
+  return Array.isArray(json) ? json : [];
+}
+
+/**
+ * A Pendle market, if this address is one.
+ *
+ * GeckoTerminal indexes no Pendle markets, so a Pendle position fails the pool fetch outright.
+ * That failure is the signal to look here instead.
+ */
+async function fetchPendleMarket(network, address) {
+  const chainId = CHAIN_IDS[network];
+  if (!chainId) return null;
+  const want = String(address).toLowerCase();
+  // The upstream caps limit at 100 and rejects anything larger.
+  for (let skip = 0; skip < 300; skip += 100) {
+    const res = await fetch(`${PENDLE}/${chainId}/markets?limit=100&skip=${skip}&is_active=true`,
+      { headers: { accept: 'application/json' } });
+    if (!res.ok) throw new Error(`Pendle HTTP ${res.status}`);
+    const page = await res.json();
+    const batch = page.results || [];
+    const hit = batch.find((m) => String(m.address).toLowerCase() === want);
+    if (hit) return hit;
+    if (batch.length < 100) break;
+  }
+  return null;
+}
+
 /* ----------------------------------------------------------------- evaluate */
+
+/**
+ * Which countdown threshold a date has crossed, or null while it is still far off.
+ *
+ * The key carries the bucket, so each threshold fires exactly once as it is passed: a campaign
+ * 40 days out is silent, then reports at 30, 14, 7, 3 and 1. Without the bucket in the key the
+ * edge-triggered state would fire once at 30 days and never mention it again.
+ */
+function dayBucket(days) {
+  if (!Number.isFinite(days) || days <= 0) return null;
+  /*
+   * Bucketed on the rounded figure the message displays, not the raw one. At 14.4 days the raw
+   * value falls in the 30 bucket while the text reads "14 days"; a day later it crosses into the
+   * 14 bucket and fires a second time with identical wording. Rounding first keeps one message
+   * per distinct thing said. Anything still short of a day stays in the 1 bucket rather than
+   * rounding to zero and going quiet in the final hours.
+   */
+  const shown = Math.max(1, Math.round(days));
+  for (const t of [1, 3, 7, 14, 30]) if (shown <= t) return t;
+  return null;
+}
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const dayText = (d) => (d < 1
+  ? plural(Math.max(1, Math.round(d * 24)), 'hour')
+  : plural(Math.max(1, Math.round(d)), 'day'));
+
+/**
+ * Incentive campaigns ending.
+ *
+ * An APR that stops next week is not the APR you are being paid, and it is the one fact about a
+ * campaign you cannot read off the pool itself.
+ */
+function evaluateCampaigns(position, campaigns, nowSec) {
+  const fired = [];
+  for (const c of campaigns) {
+    const endsAt = Number(c.latestCampaignEnd);
+    if (!Number.isFinite(endsAt)) continue;
+    const days = (endsAt - nowSec) / 86400;
+    const bucket = dayBucket(days);
+    if (bucket === null) continue;
+
+    const apr = Number(c.apr);
+    const worth = Number.isFinite(apr) && days > 0 ? apr * (days / 365) : null;
+    fired.push({
+      key: `campaign-ends-${bucket}`,
+      title: `Incentive campaign ends in ${dayText(days)}`,
+      text: `${position.label || position.address}: "${c.name || 'campaign'}" stops paying in ` +
+            `${dayText(days)}.` +
+            (Number.isFinite(apr) ? ` It quotes ${apr.toFixed(2)}% APR, which over what is left ` +
+              `is worth about ${worth.toFixed(2)}% of capital — not ${apr.toFixed(2)}%.` : '') +
+            ` After that the pool pays swap fees only.`
+    });
+  }
+  return fired;
+}
+
+/**
+ * A Pendle market approaching expiry.
+ *
+ * Unlike every other alert here this one is certain in advance: the date is fixed at launch. At
+ * expiry the PT is redeemable at par and the market stops being a yield trade, so the position
+ * has to be rolled or redeemed rather than left alone.
+ */
+function evaluatePendle(position, market, nowSec) {
+  const fired = [];
+  const expiry = Date.parse(market.expiry) / 1000;
+  if (!Number.isFinite(expiry)) return fired;
+
+  const days = (expiry - nowSec) / 86400;
+  const name = market.simpleName || market.name || position.label || position.address;
+
+  if (days <= 0) {
+    fired.push({
+      key: 'pendle-expired',
+      title: 'Pendle market has expired',
+      text: `${name}: expired. The PT is redeemable at par and the LP has stopped earning — ` +
+            `capital sitting here is idle until you redeem or roll into a later maturity.`
+    });
+    return fired;
+  }
+
+  const bucket = dayBucket(days);
+  if (bucket !== null) {
+    const implied = Number(market.impliedApy);
+    fired.push({
+      key: `pendle-expiry-${bucket}`,
+      title: `Pendle market expires in ${dayText(days)}`,
+      text: `${name}: ${dayText(days)} to expiry.` +
+            (Number.isFinite(implied)
+              ? ` Implied yield is ${(implied * 100).toFixed(2)}%, and the remaining term is ` +
+                `short enough that fees and slippage now matter more than the rate.` : '') +
+            ` Decide whether to redeem at par or roll into a later maturity.`
+    });
+  }
+  return fired;
+}
 
 /**
  * The same checks the browser runs, reduced to the ones that can be evaluated from pool state
@@ -188,12 +336,36 @@ async function main() {
   const messages = [];
   const problems = [];
 
+  const nowSec = Date.now() / 1000;
+
   for (const pos of positions) {
     const id = `${pos.network}:${pos.address}`;
     let pool;
     try {
       pool = await fetchPool(pos.network, pos.address);
     } catch (e) {
+      /*
+       * A pool that cannot be found may be a Pendle market rather than a missing pool --
+       * GeckoTerminal indexes none of them. Check before reporting a problem, so a Pendle
+       * position gets its expiry countdown instead of a weekly "pool not found".
+       */
+      let market = null;
+      try {
+        market = await fetchPendleMarket(pos.network, pos.address);
+      } catch { /* leave it to the original failure below */ }
+
+      if (market) {
+        const fired = evaluatePendle(pos, market, nowSec);
+        now[id] = fired.map((f) => f.key).sort();
+        const before = new Set(previous[id] || []);
+        for (const f of fired.filter((x) => !before.has(x.key))) {
+          messages.push(`[${f.title}]\n${f.text}`);
+        }
+        console.log(`${pos.label || id}: Pendle market, ${fired.length} condition(s) active`);
+        await new Promise((r) => setTimeout(r, 1200));
+        continue;
+      }
+
       problems.push(`${pos.label || id}: ${e.message}`);
       // Carry the previous state forward so a transient fetch failure does not re-fire
       // everything on the next successful run.
@@ -202,6 +374,15 @@ async function main() {
     }
 
     const fired = evaluate(pos, pool);
+
+    // Campaign end dates are not visible in pool state, so they are fetched separately. A
+    // failure here must not lose the pool checks that already succeeded.
+    try {
+      fired.push(...evaluateCampaigns(pos, await fetchCampaigns(pos.network, pos.address), nowSec));
+    } catch (e) {
+      problems.push(`${pos.label || id}: campaigns — ${e.message}`);
+    }
+
     now[id] = fired.map((f) => f.key).sort();
 
     const before = new Set(previous[id] || []);

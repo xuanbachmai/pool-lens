@@ -81,5 +81,21 @@ network problem does not re-fire everything on the next successful run.
 - **Volume below the 0.25 V/R benchmark** — the pool has gone quiet.
 - **Pool grown past 1.75× its size at entry** — your share of the fees has been diluted.
 
-Those are the checks that work from pool state alone. Anything needing price history stays in
-the browser, where the full analysis runs.
+Those work from pool state alone. Two more are dated events, which pool state cannot show you:
+
+- **An incentive campaign ending.** Checked against Merkl. The message carries what the campaign
+  is worth over the life it has left rather than its annualised rate — “3.39% APR, 7 days to
+  run, about 0.07% of capital”.
+- **A Pendle market approaching expiry.** GeckoTerminal indexes no Pendle markets, so a Pendle
+  position fails the pool lookup entirely; that failure is the cue to check Pendle instead. Without
+  this a Pendle position produced a weekly “pool not found” and nothing else.
+
+Both count down through 30, 14, 7, 3 and 1 day. The threshold is part of the state key, so each
+one fires once as it is crossed instead of either going silent after the first or repeating every
+run. The bucket is taken from the *rounded* day count that the message displays: bucketing the raw
+value sent two alerts a day apart both reading “expires in 14 days”.
+
+The alert runner calls Merkl and Pendle directly rather than through `api/merkl.js` and
+`api/pendle.js`. Those proxies exist only to add a CORS header for the browser, and this is Node.
+
+Anything needing price history stays in the browser, where the full analysis runs.
