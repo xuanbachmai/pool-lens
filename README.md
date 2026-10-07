@@ -459,10 +459,24 @@ fields the client reads).
 
 ## Deploying
 
-Pure static files, so any static host works. `vercel.json` sets `must-revalidate` on everything —
-the JS filenames aren't content-hashed, so this is what stops a browser serving a stale module
-after a deploy. It also sets a CSP that allows scripts only from this origin and network calls
-only to the two data APIs.
+Static files plus two serverless functions in `api/`. The pages work on any static host; the two
+functions need a host that runs them (Vercel, Netlify, Cloudflare Pages with Functions), and each
+degrades with a specific message rather than breaking the page if it's absent:
+
+| Function | Needed for | Without it |
+| --- | --- | --- |
+| `api/pendle.js` | Pendle markets — their API sends no CORS header | A Pendle link says the proxy isn't deployed; everything else is unaffected |
+| `api/ask.js` | The natural-language screening box | The box reports that the key isn't configured; the filter controls still work |
+
+`api/ask.js` reads `ANTHROPIC_API_KEY` from the host's environment. It is deliberately server-side
+only — the key must never reach the browser, which is the reason this function exists at all
+instead of calling the API from the page.
+
+`vercel.json` sets `must-revalidate` on everything: the JS filenames aren't content-hashed, so this
+is what stops a browser serving a stale module after a deploy. It also sets a CSP allowing scripts
+only from this origin and network calls only to `'self'` plus the three data APIs — GeckoTerminal,
+DexScreener and DefiLlama. `'self'` is what permits the two functions above, so dropping it breaks
+them in production only, which is a bad place to find out.
 
 ## Chain coverage
 
