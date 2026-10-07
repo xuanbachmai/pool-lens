@@ -462,10 +462,12 @@ LP.analyze = (function () {
     }
 
     if (feeInfo.type === 'pendle') {
-      add('warn', 'Pendle pool — different maths',
-        'This pool trades principal tokens against their yield-bearing asset. The impermanent-loss ' +
-        'model below assumes a constant-product spot pool and does not describe Pendle. Its LP ' +
-        'exposure is closer to holding PT (which converges to par at expiry) plus swap fees.');
+      add('info', 'Pendle pool — see the fixed-yield analysis above',
+        'This pool trades principal tokens against their yield-bearing asset, so the ' +
+        'impermanent-loss model below assumes the wrong thing: it describes a constant-product ' +
+        'spot pool whose price can go anywhere, while PT converges to par on a known date. The ' +
+        'Pendle panel above analyses it properly — implied versus floating yield, the LP yield ' +
+        'split, and whether LPing beats simply holding PT or YT.');
     }
 
     if (feeInfo.type === 'stable') {

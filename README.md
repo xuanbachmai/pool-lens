@@ -43,7 +43,7 @@ If you prefer to serve it rather than open the file directly, there is a launch 
 py -3 -m http.server 8765
 ```
 
-## Two pages
+## Four pages
 
 **`index.html`** analyses a real pool you paste a link to.
 
@@ -377,12 +377,47 @@ Two fallbacks:
 - **URLs with no address at all** (Curve's `factory-stable-ng-42` style paths): explains what to
   copy instead. There is no way to resolve those without the pool contract address.
 
+## Pendle markets get a different page
+
+Paste a Pendle market and none of the above applies. A Pendle pool trades a principal token
+against its yield-bearing wrapper, so "impermanent loss against holding" is the wrong question —
+the PT converges to par at expiry by construction. The spot panels are therefore not rendered at
+all, and the page says why instead of quietly showing numbers that don't mean anything.
+
+What it computes instead, from Pendle's own market endpoint:
+
+- **Implied yield** — the fixed rate the market is currently offering, `(1/P_pt)^(1/years) − 1`.
+  Cross-checked against the figure Pendle publishes: across 45 live Ethereum markets the median
+  disagreement was **0.01pp**.
+- **Implied vs underlying** — the spread between the fixed rate you can lock and the floating
+  rate the asset is actually earning. That spread, not IL, is the trade.
+- **Time to expiry and PT discount**, since every number on the page decays toward zero.
+- **Where the market sits on its curve.** Pendle's AMM prices off a proportion
+  `p = nPt/(nPt + nSy)` with a scalar that sharpens as expiry approaches (`rateScalar(t) =
+  scalarRoot/t`). The V2 paper treats `p ∈ [0.1, 0.9]` as the reasonable band; outside it, quotes
+  move fast. 41 of those 45 markets were inside it.
+- **What the LP APY is actually made of** — swap fees and accrued yield separately from PENDLE
+  emissions, with the vePENDLE boost shown as a multiple rather than folded in. Five of the 45
+  were more than half emissions.
+- **The alternatives, side by side:** LP, hold PT to expiry for the fixed rate, or hold YT for the
+  floating leg.
+
+Two things worth knowing about how this is wired:
+
+- **GeckoTerminal indexes no Pendle markets at all.** A Pendle URL has to be routed to Pendle's
+  API *before* the DEX lookup, not after it — otherwise resolution fails first and the Pendle
+  analysis is unreachable code, which is exactly what the first attempt turned out to be.
+- It goes through **`api/pendle.js`**, a small CORS proxy, because Pendle's endpoint sends no
+  `Access-Control-Allow-Origin` header. On a `file://` page or a static host without that
+  function, a Pendle link says precisely that rather than "no pool found".
+
 ## What it deliberately does not do
 
-- **No emissions or incentives.** Every yield figure is swap-fee only. On many pools the advertised
-  APY is mostly token emissions or a Merkl campaign — add those separately, and remember they
-  dilute as liquidity arrives.
-- **No gas, MEV, rebalancing cost, or smart-contract risk.**
+- **No Merkl or third-party campaign data.** Emissions are covered where DefiLlama splits them out
+  (`apyBase` vs `apyReward`), and Pendle markets get theirs read directly — but a Merkl campaign
+  on an ordinary DEX pool is still invisible here. Emissions also dilute as liquidity arrives.
+- **No MEV, rebalancing cost, or smart-contract risk.** Gas enters only the minimum-viable-size
+  calculation, as an editable per-chain round-trip estimate.
 - **Not advice.** Fee APR is an extrapolation of recent volume and will not repeat.
 
 ## Known approximations
@@ -399,7 +434,7 @@ These are stated in the UI too, but collected here:
 | The what-if model holds volume flat at the trailing average | A single forward number has to come from somewhere | The sweep and heat grid exist precisely so you can see what other volumes would do |
 | Execution cost assumes both swaps route through this pool | Modelling aggregator routing needs quotes the free APIs don't give | Overstates cost for well-traded pairs, where an aggregator finds a better path; accurate for thin pools, which are the ones where it matters |
 | Execution cost is priced off the pool's own mid, not an external USD price | The two data sources are sampled independently and disagreed by 0.25% on a live pool — comparable to the fee itself | Keeps a symmetric round trip symmetric instead of leaking source disagreement into "cost" |
-| Stableswap, weighted and Pendle pools use the constant-product IL formula | It's the only closed form that fits every pool type | Flagged in the risk list — for those pools treat the IL column as an upper bound (stableswap) or as not applicable (Pendle) |
+| Stableswap and weighted pools use the constant-product IL formula | It's the only closed form that fits every pool type | Flagged in the risk list — treat the IL column as an upper bound. Pendle markets are exempt: they route to their own analysis and never reach this formula |
 
 Fee tiers are read from the pool itself where the API exposes them (concentrated-liquidity pools),
 parsed from the pool name, or fall back to a per-DEX default. The header badge always says which,
@@ -480,10 +515,13 @@ tolerating a chain that legitimately has no pools this month.
 Both send `Access-Control-Allow-Origin: *`, which is why this works from a `file://` page with no
 proxy.
 
+- [Pendle](https://api-v2.pendle.finance) — active markets per chain, for the Pendle analysis.
+  This one sends no CORS header, so it is the only source needing the `api/pendle.js` proxy. The
+  upstream caps `limit` at 100 and returns 400 above it, so the proxy pages instead of asking for
+  200 in one request.
+
 ## Possible next steps
 
-- Pendle-specific mode using the Pendle V2 principal-token AMM (implied yield, time to expiry,
-  PT-to-par convergence) instead of spot IL.
 - Read the live v3 tick distribution on-chain so the concentration multiplier reflects real
   competing liquidity rather than assuming it's static.
 - Pull Merkl campaign data to fold incentives into the yield figures.

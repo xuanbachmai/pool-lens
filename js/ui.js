@@ -18,6 +18,7 @@ LP.ui = (function () {
     overrides: { fee: null, lpShare: null },
     assumptions: { positionUsd: 10000, holdDays: 30, rangePct: 20 },
     result: null,
+    pendle: null,
     siblings: null
   };
 
@@ -38,6 +39,7 @@ LP.ui = (function () {
   function clearResults() {
     $('#results').classList.add('hidden');
     $('#results').innerHTML = '';
+    state.pendle = null;
     state.pool = null; state.result = null; state.cross = null; state.hist = [];
     state.histError = null; state.candidates = []; state.siblings = null; state.baseFeeInfo = null;
   }
@@ -79,8 +81,17 @@ LP.ui = (function () {
       (target.chain ? ' on <code>' + esc(target.chain) + '</code>' : ' (chain not named in the URL)') + '…');
 
     try {
+      /*
+       * Pendle first when the URL says so. GeckoTerminal does not index Pendle markets at all,
+       * so going there first would fail with "no pool found" and the Pendle analysis would be
+       * unreachable -- which is exactly what happened before this branch existed.
+       */
+      if (target.isPendle && await tryPendle(target)) return;
+
       const resolved = await LP.api.resolvePool(target);
       if (!resolved.pool) {
+        // Not in the DEX indexes: it may still be a Pendle market, so check before giving up.
+        if (await tryPendle(target)) return;
         clearResults();
         setStatus('error',
           '<strong>No pool found for that address.</strong> The data sources index most DEXes but ' +
@@ -147,6 +158,50 @@ LP.ui = (function () {
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * Try to analyse the target as a Pendle market.
+   *
+   * A Pendle market is not a spot pool and nothing in the spot analysis applies to it, so this
+   * renders its own view rather than adding a panel to one that would be wrong throughout.
+   * @returns true if it handled the target
+   */
+  async function tryPendle(target) {
+    const chains = [];
+    if (target.chain) chains.push(target.chain);
+    // No chain in the URL: try the ones Pendle actually deploys on, biggest first.
+    else chains.push('eth', 'arbitrum', 'base', 'bsc', 'optimism', 'mantle', 'sonic',
+                     'berachain', 'avax', 'hyperevm');
+
+    setBusy(true, 'Checking Pendle…');
+    for (const net of chains) {
+      if (!LP.pendle.CHAIN_IDS[net]) continue;
+      let hit;
+      try {
+        hit = await LP.pendle.find(net, target.address);
+      } catch (e) {
+        // The proxy is missing or unreachable. Say so only if the URL claimed Pendle.
+        if (target.isPendle) {
+          clearResults();
+          setStatus('error', '<strong>This looks like a Pendle market, but the analysis could ' +
+            'not load.</strong> ' + esc(e.message || String(e)));
+          return true;
+        }
+        return false;
+      }
+      if (hit.ok) {
+        state.pendle = LP.pendle.analyse(hit.market);
+        state.pool = null;
+        state.result = null;
+        setStatus(null);
+        $('#results').innerHTML = LP.pendleUi.renderPage(state.pendle, net);
+        $('#results').classList.remove('hidden');
+        wrapWideTables();
+        return true;
+      }
+    }
+    return false;
   }
 
   function currentFeeInfo() {

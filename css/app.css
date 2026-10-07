@@ -446,3 +446,25 @@ li.alert p { margin: 5px 0 0; font-size: 13px; color: var(--muted); line-height:
 @media (max-width: 480px) {
   .btn { white-space: normal; }
 }
+
+/* ----------------------------------------------------------- Pendle panel */
+.pd-parts { display: grid; gap: 8px; margin-top: 12px; }
+.pd-part { display: grid; grid-template-columns: minmax(0,13em) 1fr auto; gap: 12px;
+  align-items: center; font-size: 13px; }
+.pd-label { color: var(--muted); }
+.pd-label em { font-style: normal; font-size: 11px; color: var(--weak); }
+.pd-bar { height: 8px; border-radius: 99px; background: var(--card-2);
+  border: 1px solid var(--line); overflow: hidden; }
+.pd-bar i { display: block; height: 100%; }
+.pd-bar i.earned { background: var(--good); }
+.pd-bar i.emis { background: var(--weak); }
+.pd-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 600; }
+.card.pendle td em { font-style: normal; color: var(--muted); font-size: 11.5px; }
+@media (max-width: 560px) {
+  /* Label and value share the top row, the bar spans beneath them. Explicit placement, because
+     auto-placement puts all three on separate rows and collapses the value column to 0px. */
+  .pd-part { grid-template-columns: 1fr auto; row-gap: 5px; }
+  .pd-label { grid-column: 1; grid-row: 1; }
+  .pd-val   { grid-column: 2; grid-row: 1; }
+  .pd-bar   { grid-column: 1 / -1; grid-row: 2; }
+}
