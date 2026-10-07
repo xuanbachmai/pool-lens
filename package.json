@@ -5,7 +5,7 @@
   "description": "Paste a DEX liquidity pool link, get a first-pass LP analysis.",
   "type": "module",
   "scripts": {
-    "test": "node test/math.test.mjs && node test/app.test.mjs && node test/llama.test.mjs",
+    "test": "node test/math.test.mjs && node test/app.test.mjs && node test/llama.test.mjs && node test/merkl.test.mjs",
     "test:fixture": "node test/fetch-fixture.mjs",
     "alerts": "node alerts/check.mjs",
     "alerts:dry": "node alerts/check.mjs --dry-run"

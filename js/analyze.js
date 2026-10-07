@@ -488,10 +488,12 @@ LP.analyze = (function () {
         'None of this small, young pool\'s liquidity is locked, so whoever seeded it can withdraw at will.');
     }
 
-    add('info', 'Emissions and incentives are not counted',
-      'Every yield number here is swap-fee only. Most advertised DEX APYs are mostly token ' +
-      'emissions or campaign rewards (Merkl and similar). Add those separately — and remember ' +
-      'they dilute as more liquidity arrives.');
+    add('info', 'The yield figures above are swap fees only',
+      'Every yield number in the panels above counts swap fees and nothing else. Emissions and ' +
+      'incentives are measured separately, lower down: DefiLlama’s split of earned versus paid ' +
+      'yield, and a direct check of Merkl campaigns including when each one ends. Add those to ' +
+      'the fee figures rather than treating either as the total — and remember incentives ' +
+      'dilute as more liquidity arrives.');
 
     return flags;
   }

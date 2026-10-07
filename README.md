@@ -377,6 +377,44 @@ Two fallbacks:
 - **URLs with no address at all** (Curve's `factory-stable-ng-42` style paths): explains what to
   copy instead. There is no way to resolve those without the pool contract address.
 
+## When does the incentive stop?
+
+An incentive APR is quoted as an annual rate, and almost never lasts a year. Merkl runs a large
+share of DeFi's campaigns and publishes the one fact that decides what the rate is worth: the end
+date. Sampling 366 live campaigns while building this:
+
+| | |
+| --- | --- |
+| Median days remaining | **21** |
+| Ending within 30 days | 269 of 366 (73%) |
+| Ending within 7 days | 89 (24%) |
+| Running beyond 180 days | **2** |
+
+So the panel leads with the end date and with what the campaign pays over its remaining life,
+keeping the annualised figure as the secondary number. On a live Balancer pool: a **3.39% APR
+with 7 days to run is worth 0.07% of capital**, not 3.39%. Both numbers are true; only one of
+them is what you would receive.
+
+Dilution is exact rather than hand-waved. For 92% of those campaigns the published APR
+reconstructs to within 10% of `dailyRewards x 365 / TVL` (median ratio 1.000), which means the
+reward pot is fixed and shared pro rata — so your own rate is `APR x T/(T+P)`, and the panel
+shows it at your position size. For the other 8% the identity fails because the campaign has
+eligibility conditions attached, and those are labelled `restricted` with no dilution figure
+rather than modelled anyway. A campaign ending within 7 days reaches the main risk list, at the
+same rounded day count the panel displays.
+
+### A CORS lesson worth writing down
+
+Merkl *looks* like it needs no proxy. Asked with curl it returns
+`access-control-allow-origin: *`. Asked by a browser it does not — that one header disappears
+when an `Origin` is present, while `allow-credentials`, `allow-methods` and `allow-headers` all
+remain. (`allow-credentials: true` is invalid alongside `*`, which is the likely cause.) The
+symptom is a bare "Failed to fetch".
+
+**A CORS check is only valid with an `Origin` header**, because that is what the server keys its
+answer on. Re-checked that way, DefiLlama really does send the header and really does need no
+proxy; Merkl needs `api/merkl.js`, which also trims a ~10 KB opportunity down to about 560 bytes.
+
 ## Pendle markets get a different page
 
 Paste a Pendle market and none of the above applies. A Pendle pool trades a principal token
@@ -413,9 +451,9 @@ Two things worth knowing about how this is wired:
 
 ## What it deliberately does not do
 
-- **No Merkl or third-party campaign data.** Emissions are covered where DefiLlama splits them out
-  (`apyBase` vs `apyReward`), and Pendle markets get theirs read directly — but a Merkl campaign
-  on an ordinary DEX pool is still invisible here. Emissions also dilute as liquidity arrives.
+- **No third-party campaign data beyond Merkl.** Emissions are covered three ways — DefiLlama's
+  `apyBase`/`apyReward` split, Merkl campaigns directly, and Pendle markets' own breakdown — but
+  an incentive run outside those is still invisible here.
 - **No MEV, rebalancing cost, or smart-contract risk.** Gas enters only the minimum-viable-size
   calculation, as an editable per-chain round-trip estimate.
 - **Not advice.** Fee APR is an extrapolation of recent volume and will not repeat.
@@ -466,6 +504,7 @@ degrades with a specific message rather than breaking the page if it's absent:
 | Function | Needed for | Without it |
 | --- | --- | --- |
 | `api/pendle.js` | Pendle markets — their API sends no CORS header | A Pendle link says the proxy isn't deployed; everything else is unaffected |
+| `api/merkl.js` | Checking incentive campaigns — Merkl withholds its CORS header from browsers | The campaign panel says the function is missing; every other panel is unaffected |
 | `api/ask.js` | The natural-language screening box | The box reports that the key isn't configured; the filter controls still work |
 
 `api/ask.js` reads `ANTHROPIC_API_KEY` from the host's environment. It is deliberately server-side
@@ -533,10 +572,13 @@ proxy.
   This one sends no CORS header, so it is the only source needing the `api/pendle.js` proxy. The
   upstream caps `limit` at 100 and returns 400 above it, so the proxy pages instead of asking for
   200 in one request.
+- [Merkl](https://api.merkl.xyz) — live incentive campaigns and, crucially, their end dates.
+  Sends its CORS header to everything except a browser, so it goes through `api/merkl.js` too.
+  Its `items` parameter caps at 100 as well, though the per-pool lookup filters server-side by
+  address and needs only one request.
 
 ## Possible next steps
 
 - Read the live v3 tick distribution on-chain so the concentration multiplier reflects real
   competing liquidity rather than assuming it's static.
-- Pull Merkl campaign data to fold incentives into the yield figures.
 - Multi-pool watchlist and a saveable comparison table.

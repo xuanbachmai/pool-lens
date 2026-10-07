@@ -131,6 +131,7 @@ LP.ui = (function () {
       LP.execution.reset();
       LP.position.reset();
       LP.emissions.reset();
+      LP.merkl.reset();
 
       // Start with a range width that reflects how this pair actually moves over the hold period.
       const suggestion = LP.backtest.suggestRange(
@@ -229,6 +230,14 @@ LP.ui = (function () {
      * 0.05% pool. Ethereum WETH/USDC alone has 21 candidates across four tiers.
      */
     LP.emissions.autoMatch(state.result);
+
+    /*
+     * Merkl is a single ~10 KB filtered request, so it loads without being asked. It renders
+     * when it resolves; a failure is confined to its own panel and never blocks the analysis.
+     */
+    LP.merkl.autoLoad(state.result, () => {
+      if (state.result) render(state.result);
+    });
     render(state.result);
   }
 
@@ -246,6 +255,7 @@ LP.ui = (function () {
       LP.position.render(r),
       LP.strategy.render(r),
       LP.emissions.render(r),
+      LP.merkl.render(r),
       LP.execution.render(r),
       LP.whatif.render(r),
       LP.whatif.renderFormulas(r),
@@ -644,7 +654,9 @@ LP.ui = (function () {
 
   function renderFlags(r) {
     const order = { critical: 0, warn: 1, info: 2 };
-    const flags = r.flags.slice().sort((a, b) => order[a.level] - order[b.level]);
+    // Merkl lands after the analysis, so its flags join here rather than in r.flags.
+    const flags = r.flags.concat(LP.merkl.flags())
+      .slice().sort((a, b) => order[a.level] - order[b.level]);
     const items = flags.map((f) => `
       <li class="flag ${esc(f.level)}">
         <strong>${esc(f.title)}</strong>
