@@ -100,6 +100,47 @@ LP.fees = (function () {
       note: 'This is a Pendle PT/asset pool. Its AMM prices fixed yield, not spot, so the constant-product IL maths below does not describe it. Pendle LP risk is closer to "PT drifts to par by expiry" than to conventional IL.'
     },
     { test: /fluid/i, label: 'Fluid DEX', type: 'cl', fee: null, lpShare: 1.0 },
+
+    /*
+     * Added after auditing our coverage against every project DefiLlama tracks. Measured on
+     * genuine AMM pools only -- two-sided and IL-bearing, so a lending market having no swap-fee
+     * profile is correct rather than a gap -- 26 profiles covered 72% of AMM TVL and 144
+     * projects covered none of it. These close the largest real DEXes in that tail.
+     *
+     * Where the exact fee or protocol cut is not something we can state confidently, fee stays
+     * null so it is read from the API or the pool name instead of being invented here.
+     */
+
+    // QuickSwap v2 ships as "quickswap-dex"; only its v3 matched, via the Algebra entry above.
+    { test: /quickswap/i, label: 'QuickSwap v2', type: 'cpmm', fee: 0.30, lpShare: 1.0,
+      note: 'A protocol cut may apply; check the pool page if the fee matters to your sizing.' },
+    { test: /vvs-/i, label: 'VVS Finance', type: 'cpmm', fee: 0.30, lpShare: 1.0,
+      note: 'Uniswap v2-style AMM on Cronos. Part of the swap fee may go to the protocol.' },
+    { test: /minswap/i, label: 'Minswap', type: 'cpmm', fee: 0.30, lpShare: 1.0 },
+    { test: /ston\.?fi/i, label: 'STON.fi', type: 'cpmm', fee: null, lpShare: 1.0 },
+    { test: /cetus/i, label: 'Cetus CLMM', type: 'cl', fee: null, lpShare: 1.0 },
+    { test: /ekubo/i, label: 'Ekubo', type: 'cl', fee: null, lpShare: 1.0 },
+    { test: /kamino-liquidity/i, label: 'Kamino Liquidity', type: 'cl', fee: null, lpShare: 1.0,
+      note: 'Kamino vaults manage a concentrated range for you, so the range analysis describes the vault’s position rather than one you chose.' },
+    { test: /project-x|nest-cl/i, label: 'Hyperliquid concentrated DEX', type: 'cl', fee: null, lpShare: 1.0 },
+    { test: /sparkdex/i, label: 'SparkDEX', type: 'cl', fee: null, lpShare: 1.0 },
+    { test: /hyperswap/i, label: 'HyperSwap', type: 'cl', fee: null, lpShare: 1.0 },
+    { test: /pharaoh/i, label: 'Pharaoh', type: 'cl', fee: null, lpShare: 0.0, veModel: true,
+      note: 'A ve(3,3) concentrated DEX: swap fees go to veToken voters rather than to LPs, so the fee APR reads near zero by design and the real return is emissions.' },
+    { test: /osmosis/i, label: 'Osmosis', type: 'weighted', fee: null, lpShare: 1.0,
+      note: 'Osmosis pools can be weighted or stableswap and set their own fee, so the 50/50 constant-product IL used here is an approximation.' },
+    { test: /hydration/i, label: 'Hydration omnipool', type: 'other', fee: null, lpShare: 1.0,
+      note: 'Hydration uses a single omnipool rather than token pairs, so pairwise IL does not describe it.' },
+
+    /*
+     * Not AMMs, but they appear in pool lists marked two-sided with IL risk, which would
+     * otherwise run the constant-product maths over something it does not describe. Typing them
+     * 'other' is the same move the Pendle entry makes: say what it is, and decline to pretend.
+     */
+    { test: /gmx.*(v2|solana)|gm-pool/i, label: 'GMX GM pool', type: 'other', fee: null, lpShare: 1.0,
+      note: 'A GM pool backs perpetual traders rather than spot swaps. Its return is trader PnL plus borrow fees, and its risk is being the counterparty to those traders — not impermanent loss.' },
+    { test: /beefy|convex|stake-dao|yearn/i, label: 'Yield aggregator vault', type: 'other', fee: null, lpShare: 1.0,
+      note: 'This is a vault wrapping someone else’s LP position, usually on Curve or a major DEX. Analyse the underlying pool for the fee and IL picture; the vault adds its own fee and auto-compounding on top.' },
     { test: /dodo/i, label: 'DODO PMM', type: 'other', fee: null, lpShare: 1.0 },
     { test: /pumpswap|pump-fun|four-meme|moonshot/i,
       label: 'Memecoin launchpad AMM', type: 'cpmm', fee: null, lpShare: 0.80,

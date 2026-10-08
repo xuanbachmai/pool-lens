@@ -345,6 +345,39 @@ LP.screener = (function () {
       maxRewardShare: null, sort: 'vr', excludeOutliers: true, chain: 'any', search: '',
       minConfidence: 40, minVr: 0.25, maxVr: 5
     }));
+
+    /*
+     * The two presets below come out of backtest/, not out of an opinion.
+     *
+     * Over the last 365 days, across 27 configurations of rebalance period, basket size and
+     * cost, ranking IL-bearing constant-product pools by fee APR beat equal-weighting the whole
+     * sleeve in 27 of 27, median +10.1% against +3.8% -- measured as excess return over simply
+     * holding the same tokens, with impermanent loss computed from real token prices.
+     *
+     * Ranking by total APY scored marginally higher (+10.5%), but it leans on emissions, and
+     * emissions end -- the campaign panel exists because the median Merkl campaign has 21 days
+     * left. Fee APR is the same result without that dependence, so that is what this encodes.
+     *
+     * A TVL floor is part of the rule rather than decoration: the strategy was tested with
+     * yields diluted to a $100k position, which small pools cannot sustain.
+     */
+    on('scPresetBtDual', 'click', () => applyPreset({
+      exposure: 'multi', stablecoin: false, noIlRisk: false, minTvl: 5e6, minApy: 0,
+      maxRewardShare: 0.5, sort: 'base', excludeOutliers: true, chain: 'any', search: '',
+      minConfidence: 50, minVr: 0, maxVr: 0
+    }));
+
+    /*
+     * The no-IL sleeve. Less spectacular and far more dependable: in all 27 configurations the
+     * worst result was still positive (+2.9% at its worst, +5.4% median, against +1.8% for
+     * equal-weighting the sleeve). Nothing here is a promise -- see backtest/README.md on
+     * survivorship bias -- but it is the only sleeve that never lost in any configuration.
+     */
+    on('scPresetBtSingle', 'click', () => applyPreset({
+      exposure: 'any', stablecoin: false, noIlRisk: true, minTvl: 5e6, minApy: 0,
+      maxRewardShare: 0.5, sort: 'base', excludeOutliers: true, chain: 'any', search: '',
+      minConfidence: 50, minVr: 0, maxVr: 0
+    }));
   }
 
   /**
