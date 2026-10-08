@@ -169,4 +169,40 @@ check('the chains with the most pools are all mapped',
     .filter((c) => !new Set(Object.values(L.CHAINS)).has(c.chain))
     .map((c) => c.chain + ' (' + c.n + ')').join(', '));
 
+/*
+ * Snapshot freshness. The dataset is held for the whole session so filtering stays instant,
+ * which means the page can be showing hour-old yields with nothing saying so. These cover the
+ * age being reported and the snapshot being genuinely replaceable.
+ */
+suite('llama freshness');
+{
+  check('a loaded snapshot records when it was taken', typeof L.loadedAt() === 'number');
+  const age = L.ageSeconds();
+  check('and reports an age in seconds', age !== null && age >= 0 && age < 120, 'age=' + age);
+}
+{
+  // A fresh module, so the counters start clean.
+  let calls = 0;
+  const data = { data: [{ pool: 'a', project: 'uniswap-v3', chain: 'Ethereum', symbol: 'A-B',
+    tvlUsd: 1e6, apy: 1, apyBase: 1, apyReward: null, underlyingTokens: [] }] };
+  const LP2 = loadLP(['util', 'llama'], {
+    fetch: async () => { calls++; return { ok: true, status: 200, json: async () => data }; }
+  });
+  const M = LP2.llama;
+
+  check('nothing is loaded before the first call', M.loadedAt() === null && M.ageSeconds() === null);
+  await M.load();
+  check('one fetch after loading', calls === 1);
+  const first = M.loadedAt();
+
+  await M.load();
+  check('a second load is served from the snapshot', calls === 1, 'calls=' + calls);
+  check('and does not move the timestamp', M.loadedAt() === first);
+
+  await M.refresh();
+  check('refresh really re-fetches', calls === 2, 'calls=' + calls);
+  check('and moves the timestamp forward', M.loadedAt() >= first);
+  check('the data is still usable afterwards', M.count() === 1 && M.rows().length === 1);
+}
+
 report();

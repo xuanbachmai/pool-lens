@@ -468,3 +468,11 @@ li.alert p { margin: 5px 0 0; font-size: 13px; color: var(--muted); line-height:
   .pd-val   { grid-column: 2; grid-row: 1; }
   .pd-bar   { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* An inline control that reads as part of the sentence it sits in, not as a button. */
+.linklike {
+  background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
+  color: var(--accent); text-decoration: underline; text-underline-offset: 2px;
+}
+.linklike:hover { opacity: 0.8; }
+.linklike:disabled { cursor: default; opacity: 0.6; text-decoration: none; }

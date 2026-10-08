@@ -44,6 +44,45 @@ LP.screener = (function () {
     error: null
   };
 
+  /**
+   * Say how old the snapshot is, and offer to replace it.
+   *
+   * The dataset is fetched once and held for the session, which is what makes filtering instant.
+   * The cost is that an hour later the page is quietly showing hour-old yields. Stating the age
+   * is the honest half; the refresh button is the useful half.
+   */
+  function renderFreshness() {
+    const el = document.getElementById('scFreshness');
+    if (!el) return;
+    const age = LP.llama.ageSeconds();
+    if (age === null) { el.textContent = ''; return; }
+
+    const mins = Math.floor(age / 60);
+    const when = mins < 1 ? 'just now'
+      : mins < 60 ? mins + ' minute' + (mins === 1 ? '' : 's') + ' ago'
+      : Math.floor(mins / 60) + ' hour' + (Math.floor(mins / 60) === 1 ? '' : 's') + ' ago';
+    const stale = age > 1800;
+
+    el.innerHTML = 'Live from DefiLlama, fetched <strong>' + when + '</strong>' +
+      (stale ? ' — long enough that yields will have moved' : '') +
+      '. <button class="linklike" id="scRefresh" type="button">Refresh now</button>';
+
+    const btn = document.getElementById('scRefresh');
+    if (btn) {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'Refreshing…';
+        try {
+          await LP.llama.refresh();
+          draw();
+        } catch (e) {
+          el.innerHTML = 'Could not refresh: ' + LP.util.escapeHtml(e.message || String(e)) +
+            ' The figures above are the last good snapshot.';
+        }
+      });
+    }
+  }
+
   /* -------------------------------------------------------------------- load */
 
   async function init() {
@@ -154,6 +193,7 @@ LP.screener = (function () {
 
     $('scCount').textContent = rows.length.toLocaleString('en-US');
     $('scTotal').textContent = LP.llama.count().toLocaleString('en-US');
+    renderFreshness();
     writeHash();
 
     if (!rows.length) {

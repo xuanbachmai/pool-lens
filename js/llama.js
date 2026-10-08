@@ -23,6 +23,7 @@ LP.llama = (function () {
   let cache = null;        // raw pool array as returned by the API
   let shaped = null;       // the same rows normalised, built once (see rows())
   let inflight = null;     // de-dupe concurrent callers
+  let fetchedAt = null;    // ms epoch of the snapshot, so the UI can state its age
 
   /*
    * GeckoTerminal network id -> DefiLlama chain NAME.
@@ -54,9 +55,17 @@ LP.llama = (function () {
 
   /* -------------------------------------------------------------------- load */
 
-  async function load() {
-    if (cache) return cache;
-    if (inflight) return inflight;
+  /**
+   * Load the dataset, or return the snapshot already in memory.
+   *
+   * The snapshot is held for the whole session, which is what makes filtering instant -- but it
+   * also means that after an hour the page is showing hour-old yields with nothing saying so.
+   * `fetchedAt` is recorded so the UI can state the age, and `refresh()` discards it.
+   */
+  async function load(force) {
+    if (cache && !force) return cache;
+    if (inflight && !force) return inflight;
+    if (force) { cache = null; shaped = null; inflight = null; }
 
     inflight = (async () => {
       let res;
@@ -74,6 +83,7 @@ LP.llama = (function () {
       const json = await res.json();
       cache = (json && json.data) || [];
       shaped = null;          // invalidate the normalised view
+      fetchedAt = Date.now();
       inflight = null;
       return cache;
     })();
@@ -82,6 +92,12 @@ LP.llama = (function () {
 
   const isLoaded = () => cache !== null;
   const count = () => (cache ? cache.length : 0);
+
+  /** When the snapshot in memory was taken, and how old it is in seconds. */
+  const loadedAt = () => fetchedAt;
+  const ageSeconds = () => (fetchedAt === null ? null : (Date.now() - fetchedAt) / 1000);
+  /** Discard the snapshot and pull a fresh one. */
+  const refresh = () => load(true);
 
   /**
    * The dataset normalised once.
@@ -386,6 +402,7 @@ LP.llama = (function () {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => ({ chain: c, n }));
   }
 
-  return { load, isLoaded, count, rows, screen, matchPool, shape, enrich, rewardShare,
+  return { load, isLoaded, count, loadedAt, ageSeconds, refresh,
+           rows, screen, matchPool, shape, enrich, rewardShare,
            vrRatio, confidence, chains, CHAINS };
 })();
