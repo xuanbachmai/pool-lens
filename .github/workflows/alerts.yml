@@ -1,5 +1,9 @@
-# Pristine copy of the installed workflow. The live one is .github/workflows/alerts.yml;
-# keep them in step if you edit either. See alerts/README.md.
+# Installed from alerts/workflow.yml. Edit alerts/positions.json to choose what is
+# watched, and see alerts/README.md for the notification secrets.
+#
+# With no secrets set this still runs green: it prints what it would have sent to the
+# Actions log rather than failing. To stop it, delete this file or disable it in the
+# Actions tab.
 
 name: Pool alerts
 

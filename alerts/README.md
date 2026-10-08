@@ -39,23 +39,18 @@ base token in quote terms — the same number the analyser shows as your entry p
 With no channel configured the job prints to the Actions log instead of failing, which is a
 fine way to try it first.
 
-3. **Install the workflow.** It ships here as `alerts/workflow.yml` rather than in
-   `.github/workflows/` because pushing to that directory needs a GitHub token with the
-   `workflow` scope, which the CLI does not have by default. Either:
+3. **The workflow is already installed** at `.github/workflows/alerts.yml`, and runs every
+   30 minutes. Adjust the cron inside it, or trigger a run by hand from the Actions tab.
 
-   - **In the browser** (no scope needed): open the repo on GitHub → Add file → Create new file →
-     name it `.github/workflows/alerts.yml` → paste the contents of `alerts/workflow.yml` → commit.
-   - **From the CLI**, grant the scope once and move it:
+   `alerts/workflow.yml` is kept as the pristine copy of the same file. Pushing to
+   `.github/workflows/` needs a GitHub token carrying the `workflow` scope — if you ever edit the
+   installed copy from a machine whose token lacks it, the push is rejected with a message about
+   the scope rather than about the file. `gh auth refresh -h github.com -s workflow` grants it,
+   or edit the file in the GitHub web UI, which needs no scope at all.
 
-     ```bash
-     gh auth refresh -h github.com -s workflow
-     mkdir -p .github/workflows
-     git mv alerts/workflow.yml .github/workflows/alerts.yml
-     git commit -m "Install alert workflow" && git push
-     ```
-
-   It runs every 30 minutes once installed. Adjust the cron inside the file, or trigger it by
-   hand from the Actions tab.
+   **To stop it**: delete `.github/workflows/alerts.yml`, or disable it under the Actions tab.
+   It commits `alerts/state.json` back to the repo when something fires, so that an alert goes
+   out once on the edge rather than every half hour.
 
 ## Try it locally
 
