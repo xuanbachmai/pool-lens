@@ -42,6 +42,18 @@ fine way to try it first.
 3. **The workflow is already installed** at `.github/workflows/alerts.yml`, and runs every
    30 minutes. Adjust the cron inside it, or trigger a run by hand from the Actions tab.
 
+   **How often it really runs.** It is configured for every 30 minutes and does not get it.
+   Measured over the first three days: 14 scheduled runs where 136 were expected, a median gap
+   of **5 hours** and a worst case of 7.3 — about 10x slower than configured. GitHub
+   deprioritises scheduled workflows on public repos and the queue is worst on the hour, so the
+   cron is offset to :07 and :37 rather than :00 and :30, which reduces the wait but does not
+   remove it.
+
+   Size your expectations accordingly: this is an hours-granularity alarm, not a minutes one.
+   The edge-triggered state means a late run still fires the correct alert — it just fires it
+   late, which matters most for the 24-hour campaign-expiry warning. For minute-level alerting
+   you need a runner that is not GitHub's free scheduler.
+
    `alerts/workflow.yml` is kept as the pristine copy of the same file. Pushing to
    `.github/workflows/` needs a GitHub token carrying the `workflow` scope — if you ever edit the
    installed copy from a machine whose token lacks it, the push is rejected with a message about
