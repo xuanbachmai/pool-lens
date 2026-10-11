@@ -41,6 +41,7 @@
   <header class="top">
     <div class="nav">
       <span class="here">Farm screener</span>
+      <a href="explore.html">→ explore</a>
       <a href="index.html">→ analyse a pool</a>
       <a href="book.html">→ your book</a>
       <a href="amm.html">→ how the AMM formula works</a>
@@ -83,6 +84,8 @@
           </select>
         </label>
         <label>Chain <select id="scChain"><option value="any">Any chain</option></select></label>
+        <label>Category <select id="scCategory"><option value="any">Any category</option></select></label>
+        <label>Group <select id="scGroup"><option value="any">Any group</option></select></label>
         <label>Sort by
           <select id="scSort">
             <option value="base" selected>Earned yield</option>
@@ -194,6 +197,8 @@
 </div>
 
 <script src="js/util.js"></script>
+<script src="js/fees.js"></script>
+<script src="js/categories.js"></script>
 <script src="js/llama.js"></script>
 <script src="js/ask.js"></script>
 <script src="js/screener.js"></script>

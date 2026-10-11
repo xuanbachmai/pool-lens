@@ -43,13 +43,15 @@ If you prefer to serve it rather than open the file directly, there is a launch 
 py -3 -m http.server 8765
 ```
 
-## Four pages
+## Five pages
 
 **`index.html`** analyses a real pool you paste a link to.
 
 **`book.html`** shows every position you've saved at once.
 
 **`farm.html`** screens ~17,000 farms across both kinds of exposure.
+
+**`explore.html`** groups the whole universe by category, by chain, and by protocol.
 
 **`amm.html`** is a standalone demo of the formula underneath it — drag a trade along the curve,
 compare depth across pool sizes, test whether splitting an order helps, watch impermanent loss
@@ -68,6 +70,26 @@ Things the demo makes concrete, all computed live rather than asserted:
 - The **no-arbitrage band is only a fee wide** — $2,991.00 to $3,009.03 on a $3,000 pool at 0.30%,
   which is ±f/(1−f). Set the fee to zero and it collapses to a point.
 - The same 20 ETH trade costs **25.4% in a 100 ETH pool and 2.3% in a 1,000 ETH pool**.
+
+## Where the yield is
+
+The screener answers “which pool”. `explore.html` answers “where should I be looking at all”:
+16,881 pools and $150B of TVL grouped four ways — DefiLlama’s own 42 categories, a coarser set of
+groups, the 105 chains, or the individual protocols. Each row carries the pool count, TVL, median
+APY, median fee APR, the earned-versus-emitted split as a bar, and the share of pools that are
+two-sided and therefore exposed to divergence. Clicking a row opens the screener filtered to it.
+
+**Medians, never means.** A category’s mean APY is set by whichever pool is quoting four figures
+today, which is a fact about one outlier rather than about the category. Pools DefiLlama flags as
+outliers are excluded from the yield medians but still counted in the pool and TVL totals, because
+they are real money even when their quoted rate is not believable. There is a test that fails if
+anyone swaps a median for a mean.
+
+The categories come from DefiLlama’s protocol list, which the yields endpoint does not carry — the
+two join on project slug, exactly, every project and every pool. That join lives in a 12 KB baked
+map (`js/categories.js`, regenerate with `node tools/build-categories.mjs`) rather than a second
+9.1 MB fetch in the browser. Projects added since the last build fall through to an inference from
+our own fee table: if we recognise it as an AMM, it is a DEX whatever DefiLlama has not told us yet.
 
 ## What it answers
 

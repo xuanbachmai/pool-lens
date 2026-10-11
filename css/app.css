@@ -18,11 +18,19 @@
     --weak: #e5a23c;
     --bad: #ef5f6b;
     --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+    /*
+     * Native controls follow this. Without it a <select> renders as black-on-white against a
+     * #0c0f16 page, which is what it was doing: measured colorScheme "normal", control
+     * background rgb(255,255,255).
+     */
+    color-scheme: dark;
   }
   @media (prefers-color-scheme: light) {
     :root {
       --bg: #f6f7fb; --card: #ffffff; --card-2: #f2f4fa; --line: #e2e6f0;
       --text: #131722; --muted: #5d6780;
+      color-scheme: light;
     }
   }
   * { box-sizing: border-box; }

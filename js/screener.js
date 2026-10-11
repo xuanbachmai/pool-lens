@@ -27,6 +27,8 @@ LP.screener = (function () {
   const state = {
     exposure: 'any',
     chain: 'any',
+    category: 'any',
+    group: 'any',
     stablecoin: false,
     noIlRisk: false,
     excludeOutliers: true,
@@ -112,6 +114,28 @@ LP.screener = (function () {
     sel.innerHTML = '<option value="any">Any chain</option>' +
       chains.map((c) => '<option value="' + esc(c.chain) + '">' + esc(c.chain) +
         ' (' + c.n + ')</option>').join('');
+
+    buildCategoryFilter();
+  }
+
+  /** Categories and groups, counted from the data so new ones appear on their own. */
+  function buildCategoryFilter() {
+    const cats = LP.categories ? LP.categories.present(LP.llama.rows()) : [];
+    const catSel = $('scCategory');
+    if (catSel) {
+      catSel.innerHTML = '<option value="any">Any category</option>' +
+        cats.map((c) => '<option value="' + esc(c.category) + '">' + esc(c.category) +
+          ' (' + c.n + ')</option>').join('');
+    }
+    const groups = new Map();
+    for (const c of cats) groups.set(c.group, (groups.get(c.group) || 0) + c.n);
+    const grpSel = $('scGroup');
+    if (grpSel) {
+      grpSel.innerHTML = '<option value="any">Any group</option>' +
+        [...groups.entries()].sort((a, b) => b[1] - a[1])
+          .map(([g, n]) => '<option value="' + esc(g) + '">' + esc(g) +
+            ' (' + n + ')</option>').join('');
+    }
   }
 
   /* ------------------------------------------------------------------ sharing */
@@ -125,13 +149,15 @@ LP.screener = (function () {
     e: 'exposure', c: 'chain', s: 'sort', q: 'search',
     tvl: 'minTvl', apy: 'minApy', rw: 'maxRewardShare',
     cf: 'minConfidence', vrn: 'minVr', vrx: 'maxVr',
-    st: 'stablecoin', nil: 'noIlRisk', ox: 'excludeOutliers', n: 'limit'
+    st: 'stablecoin', nil: 'noIlRisk', ox: 'excludeOutliers', n: 'limit',
+    cat: 'category', gr: 'group'
   };
   const DEFAULTS = {
     exposure: 'any', chain: 'any', sort: 'base', search: '',
     minTvl: 1e6, minApy: 0, maxRewardShare: null,
     minConfidence: 0, minVr: 0, maxVr: 0,
-    stablecoin: false, noIlRisk: false, excludeOutliers: true, limit: 60
+    stablecoin: false, noIlRisk: false, excludeOutliers: true, limit: 60,
+    category: 'any', group: 'any'
   };
 
   function writeHash() {
@@ -302,6 +328,8 @@ LP.screener = (function () {
 
     on('scExposure', 'change', () => { state.exposure = $('scExposure').value; draw(); });
     on('scChain', 'change', () => { state.chain = $('scChain').value; draw(); });
+    on('scCategory', 'change', () => { state.category = $('scCategory').value; draw(); });
+    on('scGroup', 'change', () => { state.group = $('scGroup').value; draw(); });
     on('scSort', 'change', () => { state.sort = $('scSort').value; draw(); });
     on('scStable', 'change', () => { state.stablecoin = $('scStable').checked; draw(); });
     on('scNoIl', 'change', () => { state.noIlRisk = $('scNoIl').checked; draw(); });
@@ -428,6 +456,8 @@ LP.screener = (function () {
   function syncControls() {
     $('scExposure').value = state.exposure;
     $('scChain').value = state.chain;
+    if ($('scCategory')) $('scCategory').value = state.category || 'any';
+    if ($('scGroup')) $('scGroup').value = state.group || 'any';
     $('scSort').value = state.sort;
     $('scSearch').value = state.search;
     $('scStable').checked = state.stablecoin;

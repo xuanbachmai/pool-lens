@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where the yield is — by category and chain</title>
+<link rel="stylesheet" href="css/app.css">
+<style>
+  /*
+   * Layout: a summary strip, then one sortable table that re-groups along whichever dimension
+   * is selected. Everything here reads from the shared tokens in css/app.css.
+   */
+  .ex-dims { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .ex-dims .btn { padding: 8px 14px; font-size: 13px; }
+  .ex-dims .btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .ex-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1px; margin-top: 18px; background: var(--line); border: 1px solid var(--line);
+    border-radius: 12px; overflow: hidden; }
+  .ex-summary > div { background: var(--card); padding: 14px 16px; min-width: 0; }
+  .ex-summary .k { font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--muted); }
+  .ex-summary .v { font-size: 21px; font-weight: 650; margin-top: 4px;
+    font-variant-numeric: tabular-nums; }
+  .ex-summary .s { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+  /* The share bar encodes composition in form, not only in a number. */
+  .ex-mix { display: flex; height: 8px; border-radius: 99px; overflow: hidden;
+    background: var(--card-2); border: 1px solid var(--line); min-width: 90px; }
+  .ex-mix i { display: block; height: 100%; }
+  .ex-mix .earned { background: var(--good); }
+  .ex-mix .emitted { background: var(--weak); }
+
+  .ex-name { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .ex-name strong { font-weight: 620; }
+  .ex-row { cursor: pointer; }
+  .ex-row:hover td { background: var(--card-2); }
+  .ex-big { font-size: 11.5px; color: var(--muted); }
+
+  .ex-bar { position: relative; min-width: 80px; }
+  /* A faint rail behind the TVL figure, so relative size reads without a separate chart. */
+  .ex-bar .rail { position: absolute; left: 0; right: 0; bottom: -3px; height: 3px;
+    background: var(--accent); opacity: 0.35; border-radius: 99px; }
+
+  @media (max-width: 560px) {
+    .ex-summary .v { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="nav">
+      <a href="index.html">→ pool analyser</a>
+      <a href="book.html">→ your book</a>
+      <a href="farm.html">→ farm screener</a>
+      <span class="here">Explore</span>
+      <a href="amm.html">→ how the AMM formula works</a>
+    </div>
+    <h1>Where the yield is</h1>
+    <p>The whole DefiLlama universe grouped the way it is actually organised — by what a protocol
+    does, and by the chain it does it on. Medians, not averages: one pool quoting four figures
+    moves a mean and tells you nothing about the category it sits in.</p>
+
+    <div class="ex-dims" id="exDims">
+      <button class="btn secondary on" data-dim="category">By category</button>
+      <button class="btn secondary" data-dim="group">By group</button>
+      <button class="btn secondary" data-dim="chain">By chain</button>
+      <button class="btn secondary" data-dim="project">By protocol</button>
+    </div>
+  </header>
+
+  <div id="exStatus" class="status">Loading the pool universe from DefiLlama…</div>
+
+  <main id="exMain" class="hidden">
+    <section class="card">
+      <div class="ex-summary" id="exSummary"></div>
+      <p class="fineprint" id="exFresh"></p>
+    </section>
+
+    <section class="card">
+      <h3 id="exTitle">By category</h3>
+      <p class="muted" id="exLede"></p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th id="exHName">Category</th>
+            <th class="num">Pools</th>
+            <th class="num">TVL</th>
+            <th class="num">Median APY</th>
+            <th class="num">Median fee APR</th>
+            <th>Earned vs emitted</th>
+            <th class="num">Two-sided</th>
+            <th>Biggest pool</th>
+          </tr></thead>
+          <tbody id="exBody"></tbody>
+        </table>
+      </div>
+      <p class="fineprint">Click any row to open the screener filtered to it. “Earned vs emitted”
+      is the median split of swap fees against incentive tokens. “Two-sided” is the share of pools
+      that carry impermanent-loss risk, which is what separates a yield you can hold from one you
+      have to watch.</p>
+    </section>
+  </main>
+
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/fees.js"></script>
+<script src="js/categories.js"></script>
+<script src="js/llama.js"></script>
+<script src="js/explore.js"></script>
+</body>
+</html>

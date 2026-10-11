@@ -172,6 +172,9 @@ LP.llama = (function () {
       id: p.pool,
       chain: p.chain,
       project: p.project,
+      category: (window.LP && LP.categories) ? LP.categories.of(p) : null,
+      group: (window.LP && LP.categories)
+        ? LP.categories.group(LP.categories.of(p)) : null,
       symbol: p.symbol,
       meta: p.poolMeta || null,
       tvlUsd: num(p.tvlUsd) || 0,
@@ -395,6 +398,8 @@ LP.llama = (function () {
 
     if (opt.exposure && opt.exposure !== 'any') list = list.filter((p) => p.exposure === opt.exposure);
     if (opt.chain && opt.chain !== 'any') list = list.filter((p) => p.chain === opt.chain);
+    if (opt.category && opt.category !== 'any') list = list.filter((p) => p.category === opt.category);
+    if (opt.group && opt.group !== 'any') list = list.filter((p) => p.group === opt.group);
     if (opt.stablecoin === true) list = list.filter((p) => p.stablecoin);
     if (opt.noIlRisk === true) list = list.filter((p) => p.ilRisk === 'no');
     if (opt.minTvl) list = list.filter((p) => p.tvlUsd >= opt.minTvl);
@@ -445,7 +450,67 @@ LP.llama = (function () {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => ({ chain: c, n }));
   }
 
-  return { load, isLoaded, count, loadedAt, ageSeconds, refresh, chart,
+  /**
+   * Aggregate the universe along one dimension: category, chain, group or project.
+   *
+   * Medians rather than means throughout. A category's mean APY is decided by whichever pool is
+   * quoting four figures today, which is a fact about one outlier and not about the category;
+   * the median says what a typical pool there actually pays. The same reasoning is why the
+   * screener's outlier filter exists.
+   *
+   * @param dimension 'category' | 'chain' | 'group' | 'project'
+   * @param opts      any screen() filter, applied before aggregating
+   */
+  function breakdown(dimension, opts) {
+    if (!cache) return [];
+    const key = dimension || 'category';
+    const list = (opts && Object.keys(opts).length)
+      ? screen(Object.assign({}, opts, { limit: null }))
+      : rows();
+
+    const buckets = new Map();
+    for (const p of list) {
+      const k = p[key] || 'Other';
+      if (!buckets.has(k)) buckets.set(k, []);
+      buckets.get(k).push(p);
+    }
+
+    const median = (xs) => {
+      const s = xs.filter((v) => v !== null && isFinite(v)).sort((a, b) => a - b);
+      if (!s.length) return null;
+      const m = Math.floor(s.length / 2);
+      return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+    };
+
+    const out = [];
+    for (const [k, ps] of buckets) {
+      const tvl = ps.reduce((a, p) => a + (p.tvlUsd || 0), 0);
+      const shares = ps.map((p) => rewardShare(p)).filter((v) => v !== null);
+      // The biggest pool is a better label for a bucket than its best-yielding one, which is
+      // usually something tiny and temporary.
+      const biggest = ps.reduce((a, b) => ((b.tvlUsd || 0) > (a.tvlUsd || 0) ? b : a), ps[0]);
+      const real = ps.filter((p) => !p.outlier);
+      out.push({
+        key: k,
+        pools: ps.length,
+        tvlUsd: tvl,
+        medianApy: median(real.map((p) => p.apy)),
+        medianBase: median(real.map((p) => p.apyBase)),
+        medianTvl: median(ps.map((p) => p.tvlUsd)),
+        emissionShare: median(shares),
+        // How much of the bucket is two-sided and therefore exposed to divergence.
+        ilShare: ps.filter((p) => p.ilRisk === 'yes').length / ps.length,
+        singleShare: ps.filter((p) => p.exposure === 'single').length / ps.length,
+        outliers: ps.length - real.length,
+        biggest: biggest ? { symbol: biggest.symbol, project: biggest.project,
+                             chain: biggest.chain, tvlUsd: biggest.tvlUsd } : null,
+        group: key === 'category' && window.LP && LP.categories ? LP.categories.group(k) : null
+      });
+    }
+    return out.sort((a, b) => b.tvlUsd - a.tvlUsd);
+  }
+
+  return { load, isLoaded, count, loadedAt, ageSeconds, refresh, chart, breakdown,
            rows, screen, matchPool, shape, enrich, rewardShare,
            vrRatio, confidence, chains, CHAINS };
 })();
