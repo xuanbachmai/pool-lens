@@ -377,6 +377,44 @@ Two fallbacks:
 - **URLs with no address at all** (Curve's `factory-stable-ng-42` style paths): explains what to
   copy instead. There is no way to resolve those without the pool contract address.
 
+## What it would actually have paid you
+
+Every other yield figure in the app looks forward: an APR extrapolated from recent volume, which
+will not repeat. One panel looks backward instead. Paste a pool, pick a holding period and a
+position size, and it replays that pool's own daily history — what the fees really paid, what the
+emissions really paid, what the price divergence really cost — and answers the only question that
+settles it: **would you have been better off just holding the two tokens?**
+
+The method is the one validated in `backtest/` across 27 configurations: fees and emissions
+compounded day by day from DefiLlama's per-pool history rather than annualised from one reading,
+impermanent loss from the pool's own price bars via `2√r/(1+r) − 1`, every day's yield scaled by
+`TVL/(TVL + your size)` because a quoted APY belongs to the capital already there, and gas charged
+both ways.
+
+On WETH/USDC 0.05% over 91 days, at $10k: fees **+3.35%**, impermanent loss **−0.98%**, gas
+**−1.20%**, net **+1.13%** against holding. Stretch the same pool to a year and it reads **+21.97%**
+— the pair round-tripped, so IL fell to −0.04%, which is path independence showing up in a real
+position rather than in a formula.
+
+The position-size control makes the cost curve concrete. Same pool, same year:
+
+| position | gas as % of it | net vs holding |
+| --- | ---: | ---: |
+| $500 | 24.0% | **−0.83%** |
+| $10,000 | 1.2% | +21.97% |
+| $1,000,000 | 0.01% | +22.86% |
+
+A $500 position loses money in a pool that paid 23% in fees, purely on the fixed cost of getting
+in and out. That is the minimum-viable-size argument arriving as realised P&L instead of as a
+chart.
+
+Two guards carried over from the backtest work, both because the data misbehaved there. Daily APY
+is winsorised at 300%, since one pool showed 16,247% cumulative over a year — the signature of TVL
+collapsing toward zero while the fee numerator stands still. And concentrated pools carry a
+warning rather than a silent number: DefiLlama divides fees by the liquidity actually deployed, so
+its `apyBase` is the return on in-range, actively-managed capital, which a passive full-range
+position does not earn.
+
 ## When does the incentive stop?
 
 An incentive APR is quoted as an annual rate, and almost never lasts a year. Merkl runs a large

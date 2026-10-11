@@ -90,6 +90,49 @@ LP.llama = (function () {
     return inflight;
   }
 
+  const chartCache = new Map();
+  const chartInflight = new Map();
+
+  /**
+   * Daily history for one pool: apy, apyBase, apyReward and tvlUsd per day, going back as far
+   * as DefiLlama has tracked it.
+   *
+   * This is what turns "what does it pay" into "what would it have paid you", so it is fetched
+   * per pool on demand rather than with the 2.4 MB universe. Responses run to a few hundred KB
+   * for a long-lived pool, which is why they are cached per id for the session.
+   */
+  async function chart(id) {
+    if (!id) throw new Error('No DefiLlama pool id to fetch history for.');
+    if (chartCache.has(id)) return chartCache.get(id);
+    if (chartInflight.has(id)) return chartInflight.get(id);
+
+    const p = (async () => {
+      let res;
+      try {
+        res = await fetch('https://yields.llama.fi/chart/' + encodeURIComponent(id),
+          { headers: { accept: 'application/json' } });
+      } catch (e) {
+        throw new Error('Could not reach yields.llama.fi for this pool’s history.');
+      }
+      if (!res.ok) throw new Error('yields.llama.fi returned HTTP ' + res.status + ' for the history.');
+      const json = await res.json();
+      const rows = (json && json.data) || [];
+      const out = rows.map((d) => ({
+        t: Date.parse(d.timestamp),
+        day: String(d.timestamp).slice(0, 10),
+        apy: num(d.apy),
+        apyBase: num(d.apyBase),
+        apyReward: num(d.apyReward),
+        tvlUsd: num(d.tvlUsd)
+      })).filter((d) => Number.isFinite(d.t)).sort((a, b) => a.t - b.t);
+      chartCache.set(id, out);
+      return out;
+    })();
+
+    chartInflight.set(id, p);
+    try { return await p; } finally { chartInflight.delete(id); }
+  }
+
   const isLoaded = () => cache !== null;
   const count = () => (cache ? cache.length : 0);
 
@@ -402,7 +445,7 @@ LP.llama = (function () {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => ({ chain: c, n }));
   }
 
-  return { load, isLoaded, count, loadedAt, ageSeconds, refresh,
+  return { load, isLoaded, count, loadedAt, ageSeconds, refresh, chart,
            rows, screen, matchPool, shape, enrich, rewardShare,
            vrRatio, confidence, chains, CHAINS };
 })();

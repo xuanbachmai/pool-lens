@@ -132,6 +132,7 @@ LP.ui = (function () {
       LP.position.reset();
       LP.emissions.reset();
       LP.merkl.reset();
+      LP.profit.reset();
 
       // Start with a range width that reflects how this pair actually moves over the hold period.
       const suggestion = LP.backtest.suggestRange(
@@ -256,6 +257,7 @@ LP.ui = (function () {
       LP.strategy.render(r),
       LP.emissions.render(r),
       LP.merkl.render(r),
+      LP.profit.render(r),
       LP.execution.render(r),
       LP.whatif.render(r),
       LP.whatif.renderFormulas(r),
@@ -274,6 +276,7 @@ LP.ui = (function () {
     });
     LP.execution.wire();
     LP.emissions.wire(() => render(state.result));
+    LP.profit.wire(() => render(state.result));
     LP.whatif.wire();
   }
 
