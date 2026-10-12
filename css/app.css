@@ -698,3 +698,60 @@ th.sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2
 @media (max-width: 720px) {
   .sc-presets .sc-actions { margin-left: 0; padding-left: 0; border-left: 0; width: 100%; }
 }
+
+/* ===========================================================================
+ * Accounts
+ * ======================================================================== */
+
+.nav-auth { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; }
+.auth-in { padding: 4px 11px; font-size: var(--t-2xs); }
+
+.auth-badge { display: inline-flex; align-items: center; gap: 7px;
+  font-size: var(--t-2xs); color: var(--muted); }
+.auth-badge .auth-dot { width: 6px; height: 6px; border-radius: 50%;
+  background: var(--good); flex: none; }
+
+/* The panel that stands in for a gated feature. It explains rather than only refusing. */
+.auth-gate {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap; padding: 16px 18px; border-radius: 12px;
+  border: 1px dashed var(--line); background: var(--card);
+}
+.auth-gate p { margin: 4px 0 0; max-width: 62ch; }
+.auth-gate .btn { flex: none; }
+
+/* A control that will ask for an account says so before it is clicked. */
+.btn.needs-account::after {
+  content: "\00a0\00b7 account";
+  font-size: var(--t-3xs); opacity: 0.7; letter-spacing: 0.02em;
+}
+
+.auth-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.auth-modal {
+  width: min(420px, 100%); background: var(--card); color: var(--text);
+  border: 1px solid var(--line); border-radius: 14px; padding: 22px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+.auth-modal h3 { margin: 0 0 8px; }
+.auth-modal p { margin: 0 0 14px; }
+.auth-modal input {
+  width: 100%; padding: 11px 13px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--card-2); color: var(--text);
+  font-size: var(--t-md);
+}
+/* The code is six digits and should read as six digits. */
+#authCode { font-family: var(--mono); letter-spacing: 0.34em; text-align: center;
+  font-size: var(--t-xl); }
+.auth-actions { display: flex; align-items: center; gap: 14px; margin-top: 14px; }
+.auth-notice { color: var(--good); font-size: var(--t-xs); margin: 12px 0 0; }
+.auth-error { color: var(--bad); font-size: var(--t-xs); margin: 12px 0 0; }
+.auth-modal .fineprint { margin-top: 14px; }
+
+@media (max-width: 560px) {
+  .nav-auth { margin-left: 0; width: 100%; }
+  .auth-gate { flex-direction: column; align-items: flex-start; }
+}

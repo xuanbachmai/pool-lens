@@ -47,6 +47,29 @@ LP.screener = (function () {
   };
 
   /**
+   * The ask box, or the reason it is not there.
+   *
+   * Natural-language search is the one gated feature that is genuinely enforced: the server
+   * refuses it without a session, because every question spends the operator's credits.
+   */
+  function renderAskSlot() {
+    const slot = document.getElementById('askSlot');
+    if (!slot || !window.LP.ask) return;
+    if (!LP.auth.allows('ask')) { slot.innerHTML = LP.auth.renderGate('ask'); return; }
+    slot.innerHTML = LP.ask.render();
+    LP.ask.wire();
+  }
+
+  /** Mark the controls that will ask for an account, so the click is not a surprise. */
+  function markGatedControls() {
+    const csv = document.getElementById('scCsv');
+    if (!csv) return;
+    const gated = !LP.auth.allows('csv');
+    csv.classList.toggle('needs-account', gated);
+    csv.title = gated ? 'Needs an account' : 'Download the current screen as CSV';
+  }
+
+  /**
    * What the dataset actually covers, stated rather than implied.
    *
    * The screener shows a filtered slice, and without a line like this there is no way to tell
@@ -120,8 +143,12 @@ LP.screener = (function () {
       status.textContent = '';
       buildChainFilter();
       const fromLink = readHash();
-      const slot = document.getElementById('askSlot');
-      if (slot && window.LP.ask) { slot.innerHTML = LP.ask.render(); LP.ask.wire(); }
+      renderAskSlot();
+      markGatedControls();
+      document.addEventListener('lp:auth', () => {
+        renderAskSlot();
+        markGatedControls();
+      });
       wire();
       if (fromLink) syncControls();
       draw();
@@ -463,7 +490,11 @@ LP.screener = (function () {
       setTimeout(() => { btn.textContent = 'Copy link to this screen'; }, 2200);
     });
 
-    on('scCsv', 'click', () => exportCsv());
+    on('scCsv', 'click', () => {
+      // Advisory, not a lock: the rows are already in the page. See js/auth.js.
+      if (!LP.auth.allows('csv')) { LP.auth.open(); return; }
+      exportCsv();
+    });
 
     on('scPresetTurnover', 'click', () => applyPreset({
       exposure: 'multi', stablecoin: false, noIlRisk: false, minTvl: 2e6, minApy: 0,

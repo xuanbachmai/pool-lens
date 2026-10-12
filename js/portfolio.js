@@ -148,6 +148,21 @@ LP.portfolio = (function () {
     const u = U();
     const saved = LP.position.listAll();
 
+    /*
+     * The book needs an account. Worth being exact about what that does and does not mean:
+     * these positions live in this browser's localStorage and never reach a server, so signing
+     * in does not sync them, back them up or protect them. It gates the feature, not the data,
+     * and the panel says so rather than implying a safety it does not provide.
+     */
+    if (!LP.auth.allows('book')) {
+      host.innerHTML = LP.auth.renderGate('book') +
+        (saved.length ? `<section class="card"><p class="muted">
+          You already have ${saved.length} position${saved.length === 1 ? '' : 's'} saved in this
+          browser. They are still there and still yours — signing in just opens the book that
+          reads them.</p></section>` : '');
+      return;
+    }
+
     if (!saved.length) {
       host.innerHTML = `<section class="card">
         <h3>No positions saved yet</h3>
@@ -266,7 +281,11 @@ LP.portfolio = (function () {
     </div>`;
   }
 
-  function init() { load(); }
+  function init() {
+    load();
+    // Redraw when the session changes, so signing in opens the book without a reload.
+    document.addEventListener('lp:auth', () => render());
+  }
 
   return { init, load, render, totals, urgency, state };
 })();

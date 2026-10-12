@@ -14,6 +14,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { readSession } from './auth.js';
 
 /*
  * Mirrors the options LP.llama.screen() understands. additionalProperties:false plus a full
@@ -95,6 +96,33 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Use POST.' });
+  }
+
+  /*
+   * This is the one endpoint where gating is enforcement rather than decoration: every call
+   * spends the operator's Anthropic credits, and before this it was open to anyone who found
+   * the URL. The check runs before the key is read, so an unauthenticated caller never reaches
+   * the paid API.
+   *
+   * Everything else in this app is browser-side JavaScript against public data, where a gate
+   * is a product signal and not a lock. This one is a lock.
+   */
+  const authSecret = process.env.AUTH_SECRET;
+  if (!authSecret) {
+    return res.status(500).json({
+      error: 'not_configured',
+      message: 'AUTH_SECRET is not set on this deployment, so sign-in cannot be verified and ' +
+        'this endpoint stays closed. The filter controls work without it.'
+    });
+  }
+  const session = readSession(req, authSecret);
+  if (!session) {
+    return res.status(401).json({
+      error: 'signin_required',
+      message: 'Natural-language search needs an account, because each question costs the ' +
+        'operator money to answer. Sign in with your email to use it — every filter on this ' +
+        'page works without one.'
+    });
   }
 
   const key = process.env.ANTHROPIC_API_KEY;

@@ -71,6 +71,63 @@ Things the demo makes concrete, all computed live rather than asserted:
   which is ±f/(1−f). Set the fee to zero and it collapses to a point.
 - The same 20 ETH trade costs **25.4% in a 100 ETH pool and 2.3% in a 1,000 ETH pool**.
 
+## Free, and what needs an account
+
+Almost everything is free and needs no account: the pool analyser, the AMM demo, the explore
+views, and the screener with every filter, column, sort and preset.
+
+Three things ask you to sign in, and they are not equally enforced. That distinction matters
+enough to put in a table rather than blur:
+
+| Feature | Enforced? | What the gate actually does |
+| --- | --- | --- |
+| Natural-language search | **Yes, server-side** | `/api/ask` refuses without a session. Every question spends the operator’s Anthropic credits, so this one is a real lock. |
+| CSV export | No | The rows are already in the page; anyone can copy them out of the DOM. The gate marks the feature. |
+| Your book | No | Saved positions live in this browser’s `localStorage` and never reach a server. Signing in does not sync, back up or protect them. |
+
+The honest summary: **the whole analysis is client-side JavaScript against public APIs**, so a
+browser-side gate is a product boundary and not access control. One endpoint runs on a server and
+costs money per call, and that one is genuinely closed. Before this it was open to anyone who
+found the URL.
+
+### How sign-in works
+
+Enter an email, get a six-digit code, type it in. No password to choose, store or leak.
+
+It needs **no database**, which is the point of the design. Both halves are derived rather than
+stored:
+
+- **The code** is `HMAC(AUTH_SECRET, email + time window)` truncated to six digits. Verifying
+  means recomputing it, so nothing has to be written down between the two requests. The current
+  and previous ten-minute window both pass, so a code that arrives at 9:59 still works at 10:01.
+- **The session** is a signed token in an httpOnly cookie — `base64(payload).HMAC(payload)`. The
+  signature makes it trustworthy; the payload is readable but not forgeable.
+
+What that costs, stated because it should not be discovered later:
+
+- A code is valid for its whole window rather than for one use.
+- Sessions cannot be revoked individually. Rotating `AUTH_SECRET` invalidates all of them.
+- There is no per-address rate limit, because a counter needs somewhere to live.
+
+Those are acceptable for gating a yield screener and would not be for anything holding funds.
+`api/auth.js` marks where a real store slots in.
+
+28 of the tests are adversarial rather than happy-path: they forge a session, swap the address in
+a signed payload, extend an expiry, replay another session’s signature, and feed malformed
+payloads that must return null rather than throw.
+
+### Setting it up
+
+| Variable | For |
+| --- | --- |
+| `AUTH_SECRET` | Signing codes and sessions. Any long random string. Without it, sign-in and `/api/ask` both refuse. |
+| `RESEND_API_KEY` | Sending the code. Without it a deployment refuses rather than pretending to have sent mail; locally it returns the code so the flow can be exercised. |
+| `AUTH_FROM_EMAIL` | Optional sender address. |
+
+Running locally with no mail provider, the code comes back in the response and the UI shows it.
+That branch is guarded on not being a deployment, because returning a sign-in code over HTTP is
+exactly the bug worth preventing.
+
 ## Where the yield is
 
 The screener answers “which pool”. `explore.html` answers “where should I be looking at all”:
