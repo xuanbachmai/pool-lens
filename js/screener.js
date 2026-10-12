@@ -47,6 +47,30 @@ LP.screener = (function () {
   };
 
   /**
+   * What the dataset actually covers, stated rather than implied.
+   *
+   * The screener shows a filtered slice, and without a line like this there is no way to tell
+   * whether “60 pools” came from a hundred or from seventeen thousand.
+   */
+  function renderCoverage() {
+    const el = document.getElementById('scCoverage');
+    if (!el) return;
+    const all = LP.llama.rows();
+    const protocols = new Set(all.map((p) => p.project)).size;
+    const chains = new Set(all.map((p) => p.chain)).size;
+    el.textContent = 'Tracking ' + all.length.toLocaleString('en-US') + ' pools across ' +
+      protocols + ' protocols on ' + chains + ' chains.';
+  }
+
+  /** Put the direction marker on whichever column is driving the sort. */
+  function markSortedColumn() {
+    for (const th of document.querySelectorAll('th.sortable')) {
+      th.classList.toggle('sorted', th.dataset.sort === state.sort);
+      th.setAttribute('aria-sort', th.dataset.sort === state.sort ? 'descending' : 'none');
+    }
+  }
+
+  /**
    * Say how old the snapshot is, and offer to replace it.
    *
    * The dataset is fetched once and held for the session, which is what makes filtering instant.
@@ -219,6 +243,8 @@ LP.screener = (function () {
 
     $('scCount').textContent = rows.length.toLocaleString('en-US');
     $('scTotal').textContent = LP.llama.count().toLocaleString('en-US');
+    renderCoverage();
+    markSortedColumn();
     renderFreshness();
     writeHash();
 
@@ -231,7 +257,7 @@ LP.screener = (function () {
     }
     $('scEmpty').innerHTML = '';
 
-    $('scBody').innerHTML = shown.map((p) => {
+    $('scBody').innerHTML = shown.map((p, i) => {
       const share = LP.llama.rewardShare(p);
       const pctReward = share === null ? null : share * 100;
       const bar = share === null ? '<span class="muted">—</span>' : `
@@ -249,6 +275,7 @@ LP.screener = (function () {
           '">' + conf + '</span>';
 
       return `<tr>
+        <td class="rank">${i + 1}</td>
         <td>
           <strong>${esc(p.symbol || '')}</strong>
           <div class="sc-sub">${esc(p.project)}${p.meta ? ' · ' + esc(p.meta) : ''} · ${esc(p.chain)}</div>
@@ -331,6 +358,36 @@ LP.screener = (function () {
     on('scCategory', 'change', () => { state.category = $('scCategory').value; draw(); });
     on('scGroup', 'change', () => { state.group = $('scGroup').value; draw(); });
     on('scSort', 'change', () => { state.sort = $('scSort').value; draw(); });
+
+    /*
+     * Column headers sort. The dropdown stays because it reaches sorts that have no column
+     * (yield stability, the 30-day average), and both write the same state so they cannot
+     * disagree.
+     */
+    const thead = document.querySelector('thead');
+    if (thead) {
+      thead.addEventListener('click', (ev) => {
+        const th = ev.target.closest('th.sortable');
+        if (!th) return;
+        state.sort = th.dataset.sort;
+        const sel = $('scSort');
+        if (sel && [...sel.options].some((o) => o.value === state.sort)) sel.value = state.sort;
+        draw();
+      });
+      // Reachable without a mouse.
+      for (const th of thead.querySelectorAll('th.sortable')) {
+        th.tabIndex = 0;
+        th.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); th.click(); }
+        });
+      }
+    }
+
+    on('scClear', 'click', () => {
+      Object.assign(state, DEFAULTS, { limit: state.limit });
+      syncControls();
+      draw();
+    });
     on('scStable', 'change', () => { state.stablecoin = $('scStable').checked; draw(); });
     on('scNoIl', 'change', () => { state.noIlRisk = $('scNoIl').checked; draw(); });
     on('scOutliers', 'change', () => { state.excludeOutliers = $('scOutliers').checked; draw(); });

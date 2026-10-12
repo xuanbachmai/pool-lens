@@ -432,7 +432,9 @@ LP.llama = (function () {
       stability: (p) => -(p.sigma === null ? 1e9 : p.sigma),
       mean30: (p) => (p.apyMean30d === null ? -1 : p.apyMean30d),
       confidence: (p) => (p.confidence === null ? -1 : p.confidence),
-      vr: (p) => (p.vr === null ? -1 : p.vr)
+      vr: (p) => (p.vr === null ? -1 : p.vr),
+      reward: (p) => (p.apyReward === null ? -1 : p.apyReward),
+      base7d: (p) => (p.apyBase7d === null ? -1 : p.apyBase7d)
     }[sort] || ((p) => p.apy);
 
     // Copy before sorting: list may still BE the memoised array when no filter narrowed it,

@@ -634,3 +634,67 @@ input, select, textarea { max-width: 100%; box-sizing: border-box; }
  */
 .metric { min-width: 0; }
 .m-value { overflow-wrap: anywhere; }
+
+/* ===========================================================================
+ * Data-table affordances
+ *
+ * Patterns taken from how DefiLlama's yields table behaves, because they are
+ * what people already expect of a table like this: you sort it by clicking the
+ * column, rows carry a rank, and the page states what the dataset covers.
+ * ======================================================================== */
+
+.sc-head { display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; }
+.sc-head h3 { margin: 0; }
+.sc-head .btn { padding: 6px 12px; font-size: var(--t-xs); }
+
+.sc-coverage { margin: 2px 0 0; color: var(--muted); font-size: var(--t-xs); }
+
+/* Rank: present for reference, never competing with the data beside it. */
+th.rank, td.rank {
+  width: 1%; white-space: nowrap; text-align: right; padding-right: 4px;
+  color: var(--muted); font-variant-numeric: tabular-nums; font-size: var(--t-2xs);
+}
+
+/*
+ * A sortable header has to look clickable before it is clicked. The caret is
+ * always in the layout so the row does not shift when sorting moves.
+ */
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable::after {
+  content: "\2193";               /* downwards arrow: this table sorts descending */
+  margin-left: 5px; opacity: 0;
+  font-size: var(--t-2xs);
+}
+th.sortable:hover { color: var(--text); }
+th.sortable:hover::after { opacity: 0.45; }
+th.sortable.sorted { color: var(--accent); }
+th.sortable.sorted::after { opacity: 1; }
+th.sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+@media (max-width: 560px) {
+  /* The rank is the first thing to go when space is short. */
+  th.rank, td.rank { display: none; }
+}
+
+/*
+ * A status box that has been emptied should disappear, not leave its border behind. The farm
+ * screener clears its loading message by setting textContent to '', which left a 26px bordered
+ * bar sitting above the filters for the rest of the session.
+ */
+.status:empty { display: none; }
+
+/*
+ * Filter presets and page actions were one undifferentiated row of nine buttons, so "Download
+ * CSV" sat among things that change what you are looking at. Actions are separated and quieter.
+ */
+.sc-presets { align-items: center; }
+.sc-presets .sc-actions {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-left: auto; padding-left: 12px; border-left: 1px solid var(--line);
+}
+.sc-presets .sc-actions .btn { background: transparent; color: var(--muted); }
+.sc-presets .sc-actions .btn:hover { color: var(--text); border-color: var(--accent); }
+@media (max-width: 720px) {
+  .sc-presets .sc-actions { margin-left: 0; padding-left: 0; border-left: 0; width: 100%; }
+}

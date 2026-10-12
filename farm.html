@@ -74,8 +74,11 @@
         <button class="btn secondary" id="scPresetBtDual">Backtested — dual-sided</button>
         <button class="btn secondary" id="scPresetBtSingle">Backtested — never lost</button>
         <span class="sc-spacer"></span>
-        <button class="btn secondary" id="scShare">Copy link to this screen</button>
-        <button class="btn secondary" id="scCsv">Download CSV</button>
+
+        <span class="sc-actions">
+          <button class="btn secondary" id="scShare">Copy link</button>
+          <button class="btn secondary" id="scCsv">Download CSV</button>
+        </span>
       </div>
 
       <div class="sc-filters">
@@ -148,19 +151,26 @@
     </section>
 
     <section class="card">
-      <h3><span id="scCount">…</span> pools match</h3>
+      <div class="sc-head">
+        <h3><span id="scCount">…</span> pools match</h3>
+        <button class="btn secondary" id="scClear" type="button">Clear filters</button>
+      </div>
+      <p class="sc-coverage" id="scCoverage"></p>
       <p class="fineprint" id="scFreshness"></p>
       <div class="table-scroll">
         <table>
           <thead><tr>
+            <th class="rank">#</th>
             <th>Pool</th>
-            <th class="num">APY</th>
-            <th class="num">Earned</th>
-            <th class="num">Emissions</th>
+            <th class="num sortable" data-sort="apy">APY</th>
+            <th class="num sortable" data-sort="base">Earned</th>
+            <th class="num sortable" data-sort="reward">Emissions</th>
             <th>Real vs incentive</th>
-            <th class="num" title="How much the figure can be trusted, 0-100">Conf.</th>
-            <th class="num" title="Daily volume / reserves. Benchmark 0.25">V/R</th>
-            <th class="num">TVL</th>
+            <th class="num sortable" data-sort="confidence"
+                title="How much the figure can be trusted, 0-100">Conf.</th>
+            <th class="num sortable" data-sort="vr"
+                title="Daily volume / reserves. Benchmark 0.25">V/R</th>
+            <th class="num sortable" data-sort="tvl">TVL</th>
             <th>Flags</th>
           </tr></thead>
           <tbody id="scBody"></tbody>
