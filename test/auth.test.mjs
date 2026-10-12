@@ -6,7 +6,7 @@
  * code for a different address, and reuse one past its window. A test that only checks the
  * happy path would pass against an implementation that accepted anything.
  */
-import { codeFor, issueSession, readSession, currentWindow } from '../api/auth.js';
+import { codeFor, issueSession, readSession, currentWindow } from '../lib/session.js';
 import { suite, check, report } from './harness.mjs';
 
 const SECRET = 'test-secret-that-is-long-enough-to-be-accepted';

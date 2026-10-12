@@ -14,7 +14,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { readSession } from './auth.js';
+import { readSession } from '../lib/session.js';
 
 /*
  * Mirrors the options LP.llama.screen() understands. additionalProperties:false plus a full

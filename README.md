@@ -110,7 +110,7 @@ What that costs, stated because it should not be discovered later:
 - There is no per-address rate limit, because a counter needs somewhere to live.
 
 Those are acceptable for gating a yield screener and would not be for anything holding funds.
-`api/auth.js` marks where a real store slots in.
+`lib/session.js` marks where a real store slots in. It lives outside `api/` deliberately: every file under `api/` is built as its own isolated function, and importing one route from another failed the first deploy of this feature.
 
 28 of the tests are adversarial rather than happy-path: they forge a session, swap the address in
 a signed payload, extend an expiry, replay another session’s signature, and feed malformed
