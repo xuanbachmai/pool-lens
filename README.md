@@ -71,6 +71,53 @@ Things the demo makes concrete, all computed live rather than asserted:
   which is ±f/(1−f). Set the fee to zero and it collapses to a point.
 - The same 20 ETH trade costs **25.4% in a 100 ETH pool and 2.3% in a 1,000 ETH pool**.
 
+## Is this pool real?
+
+Every other panel assumes the pool is what it claims and asks whether it pays. For anything
+outside the top few hundred pairs — a new token, a memecoin, a pool that appeared this morning —
+the prior question matters more: **can you sell what you buy, is the volume people or wash
+trading, and is the headline valuation supportable by the liquidity behind it?**
+
+Two halves, from different evidence:
+
+**Contract risk**, read from the token contract through GoPlus: honeypots, buy and sell taxes,
+mint authority, ownership and whether it can be reclaimed, hidden owners, self-destruct, pause
+and blacklist powers, holder concentration, how many addresses provide the liquidity. Free, no
+key, 46 chains including Solana and Tron.
+
+**Market integrity**, computed from data this app already fetched and was throwing away:
+
+- **Trades per address.** Genuine activity is many addresses trading a few times each;
+  manufactured volume is few addresses trading many. PEPE/WETH reads 1.75. Arbitrage bots also
+  trade often, so it is weighed rather than pronounced on.
+- **Sells per buy.** Buys with almost no sells is what a honeypot looks like from outside the
+  contract, whatever the contract check says.
+- **Notional value against liquidity.** A market cap only means something to the extent anyone
+  can realise it.
+- **What it costs to leave** — the one no market-cap figure can answer and this app can, because
+  it already models the curve. On a $30M PEPE pool, selling $100k slips 0.66%. On a pool that
+  opened this morning, **$1,000 slipped 30.5%**. That single number says more than any badge.
+
+### Severity comes from agreement, not from any single flag
+
+USDT reports mintable, pausable, blacklist-capable, an active owner, and half its supply in ten
+addresses. On a memecoin that combination is damning; on a regulated stablecoin it is the design,
+and required by law. A checker that shouted about it would be wrong in the way that teaches people
+to ignore checkers.
+
+So a lone flag is reported as context and escalates only when independent signals corroborate it.
+Mint authority on a pool with 15 million holders is a warning; the identical flag on one three
+days old with two liquidity providers is critical. There is a test that fails if anyone makes a
+lone flag critical again.
+
+### What it cannot tell you
+
+**The verdict never says "safe", and there is a test enforcing that.** Contract checks read code,
+not intent: a contract with no dangerous powers can still belong to a project that walks away.
+They can be stale or wrong, a token deployed hours ago may have no record at all, and nothing here
+inspects the team or anything off-chain. A clean result means these particular checks found
+nothing, and no more.
+
 ## Free, and what needs an account
 
 Almost everything is free and needs no account: the pool analyser, the AMM demo, the explore
