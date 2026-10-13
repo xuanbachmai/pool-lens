@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pool Lens Academy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  /*
+   * Layout: a persistent chapter rail beside one chapter at a time, collapsing behind a toggle
+   * on narrow screens. The course reads as a sequence, so the pager at the foot matters as much
+   * as the rail.
+   */
+  body { background: var(--bg); }
+  .ac-shell { max-width: 1180px; margin: 0 auto; padding: 0 20px 80px; }
+
+  .ac-top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 18px 0 16px; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
+  .ac-brand { display: flex; align-items: baseline; gap: 9px; font-weight: 650;
+    font-size: var(--t-lg); letter-spacing: -0.015em; }
+  .ac-brand a { color: var(--text); text-decoration: none; }
+  .ac-brand em { font-style: normal; color: var(--accent); }
+  .ac-top .ac-links { margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: var(--t-xs); }
+  .ac-top .ac-links a { color: var(--accent); text-decoration: none; }
+  .ac-top .ac-links a:hover { text-decoration: underline; }
+
+  #acToggle { display: none; }
+
+  .ac-layout { display: grid; grid-template-columns: 252px minmax(0, 1fr); gap: 42px;
+    align-items: start; }
+
+  /* The chapter rail. */
+  .ac-side { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto;
+    padding-right: 6px; }
+  .ac-group { margin-bottom: 20px; }
+  .ac-group-title { display: flex; align-items: center; gap: 8px; font-size: var(--t-2xs);
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 9px; }
+  .ac-ico { width: 18px; height: 18px; border-radius: 5px; background: var(--card-2);
+    border: 1px solid var(--line); display: grid; place-items: center;
+    font-family: var(--mono); font-size: var(--t-3xs); color: var(--accent); }
+  .ac-side ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .ac-side a { display: block; padding: 6px 10px; border-radius: 7px; font-size: var(--t-xs);
+    color: var(--muted); text-decoration: none; line-height: 1.4; }
+  .ac-side a:hover { background: var(--card-2); color: var(--text); }
+  .ac-side a.on { background: var(--card-2); color: var(--text); font-weight: 600;
+    box-shadow: inset 2px 0 0 var(--accent); }
+
+  /* The chapter itself. */
+  .ac-crumb { font-size: var(--t-2xs); text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--accent); margin-bottom: 8px; }
+  .ac-main h1 { font-size: var(--t-3xl); margin: 0 0 12px; }
+  .ac-level { display: inline-block; font-size: var(--t-xs); color: var(--muted);
+    border-left: 3px solid var(--line); padding: 4px 0 4px 12px; margin: 0 0 22px; }
+  .ac-level strong { color: var(--accent); font-family: var(--mono); }
+
+  .ac-body { max-width: 70ch; }
+  .ac-body .lead { font-size: var(--t-lg); line-height: 1.55; }
+  .ac-body h3 { font-size: var(--t-lg); margin: 30px 0 8px; }
+  .ac-body p, .ac-body li { max-width: 68ch; }
+  .ac-body ul { padding-left: 20px; }
+  .ac-body li { margin: 7px 0; }
+  .ac-body .fine { font-size: var(--t-xs); color: var(--muted); }
+
+  .formula { font-family: var(--mono); background: var(--card-2); border: 1px solid var(--line);
+    border-radius: 9px; padding: 13px 16px; font-size: var(--t-sm); overflow-x: auto; }
+
+  .steps { counter-reset: s; list-style: none; padding: 0; display: grid; gap: 14px;
+    margin: 18px 0; }
+  .steps > li { counter-increment: s; display: grid; grid-template-columns: 25px minmax(0, 1fr);
+    gap: 13px; align-items: start; margin: 0; }
+  .steps > li::before { content: counter(s); width: 25px; height: 25px; border-radius: 50%;
+    background: var(--card-2); border: 1px solid var(--line); display: grid; place-items: center;
+    font-family: var(--mono); font-size: var(--t-3xs); color: var(--muted); }
+  .steps p { margin: 3px 0 0; font-size: var(--t-sm); color: var(--muted); }
+
+  /* Callouts: note, warning, takeaway. */
+  .cal { border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    background: var(--card); border-radius: 0 10px 10px 0; padding: 14px 18px; margin: 20px 0; }
+  .cal h4 { margin: 0 0 7px; font-size: var(--t-2xs); text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--accent); }
+  .cal p { margin: 0; }
+  .cal ul { margin: 0; padding-left: 18px; }
+  .cal-note { border-left-color: var(--muted); }
+  .cal-warn { border-left-color: var(--weak); }
+  .cal-warn strong { color: var(--weak); }
+  .cal-take { border-left-color: var(--good); background: var(--card-2); }
+  .cal-take h4 { color: var(--good); }
+
+  .num-chip { font-family: var(--mono); background: var(--card-2); border: 1px solid var(--line);
+    border-radius: 5px; padding: 1px 6px; font-size: 0.92em; white-space: nowrap; }
+
+  /* Previous / Next. */
+  .ac-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 44px;
+    padding-top: 22px; border-top: 1px solid var(--line); }
+  .ac-pager a { display: block; min-width: 0; padding: 13px 16px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+    text-decoration: none; font-size: var(--t-sm); font-weight: 600; }
+  .ac-pager a:hover { border-color: var(--accent); }
+  .ac-pager a span { display: block; font-size: var(--t-3xs); text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--muted); font-weight: 400; margin-bottom: 3px; }
+  .ac-pager .next { text-align: right; }
+
+  @media (max-width: 860px) {
+    .ac-layout { grid-template-columns: 1fr; gap: 0; }
+    #acToggle { display: inline-flex; align-items: center; gap: 7px; }
+    .ac-side { display: none; position: static; max-height: none; margin-bottom: 26px;
+      padding: 16px; border: 1px solid var(--line); border-radius: 12px;
+      background: var(--card); }
+    body.ac-open .ac-side { display: block; }
+    .ac-main h1 { font-size: var(--t-2xl); }
+    .ac-pager { grid-template-columns: 1fr; }
+    .ac-pager .next { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<div class="ac-shell">
+
+  <header class="ac-top">
+    <button class="btn secondary" id="acToggle" type="button" aria-expanded="false"
+      aria-controls="acSidebar">☰ Chapters</button>
+    <div class="ac-brand"><a href="academy.html">Pool Lens <em>Academy</em></a></div>
+    <nav class="ac-links">
+      <a href="index.html">→ analyse a pool</a>
+      <a href="farm.html">→ farm screener</a>
+      <a href="docs.html">→ docs</a>
+    </nav>
+  </header>
+
+  <div class="ac-layout">
+    <aside class="ac-side" id="acSidebar" aria-label="Chapters"></aside>
+    <main class="ac-main" id="acMain"></main>
+  </div>
+
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/academy.js"></script>
+</body>
+</html>
