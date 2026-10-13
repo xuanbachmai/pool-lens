@@ -755,3 +755,21 @@ th.sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2
   .nav-auth { margin-left: 0; width: 100%; }
   .auth-gate { flex-direction: column; align-items: flex-start; }
 }
+
+/* ===========================================================================
+ * Landing hero
+ *
+ * A visitor arriving cold used to see a search box and no reason to use it.
+ * These three points are the differences from a dashboard, stated before the
+ * input rather than discovered after it.
+ * ======================================================================== */
+
+.hero-lead { font-size: var(--t-lg); line-height: 1.55; max-width: 64ch; }
+
+.hero-points { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px; margin: 20px 0 18px; }
+.hero-points > div { min-width: 0; padding: 14px 16px; border-radius: 10px;
+  background: var(--card); border: 1px solid var(--line); }
+.hero-points strong { display: block; font-size: var(--t-sm); margin-bottom: 5px; }
+.hero-points span { display: block; font-size: var(--t-xs); color: var(--muted);
+  line-height: 1.5; }

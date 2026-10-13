@@ -20,16 +20,29 @@
       <a href="farm.html">→ farm screener</a>
       <a href="explore.html">→ explore</a>
       <a href="amm.html">→ how the AMM formula works</a>
+      <a href="docs.html">→ docs</a>
     </div>
     <h1>Pool Lens</h1>
-    <p>Paste a link to any DEX liquidity pool and get a first-pass LP analysis: how much volume it
-    does relative to its size, what the swap fees actually pay you, how much impermanent loss the
-    price history would have caused, and — for concentrated pools — whether your range would have
-    held.</p>
-    <p class="fineprint">Tuned for <strong>Base</strong> and <strong>BSC</strong> first — fee
-    models, gas costs and contract checks are verified on those two, covering 99% of the
-    two-sided liquidity on each. Every other chain GeckoTerminal indexes still works; those two
-    are the ones the numbers have been checked against.</p>
+    <p class="hero-lead">Paste any DEX pool and find out <strong>what it would actually have
+    paid you</strong> — after impermanent loss, after gas, measured against simply holding the
+    tokens. And whether the pool is real before any of that matters.</p>
+
+    <div class="hero-points">
+      <div><strong>Not the advertised APY</strong>
+        <span>A pool paying 40% in fees while the pair diverges 50% has lost you money. Every
+        figure here is stated against holding.</span></div>
+      <div><strong>Can you actually sell it?</strong>
+        <span>Honeypots, taxes, mint authority, wash-traded volume, and what it really costs to
+        get out — checked before the yield.</span></div>
+      <div><strong>Will the yield still be there?</strong>
+        <span>The median incentive campaign has 21 days left. Those get an end date, not an
+        annual rate.</span></div>
+    </div>
+
+    <p class="fineprint">No wallet, no account, nothing to install. Verified on
+    <strong>Base</strong> and <strong>BSC</strong> first — fee models, gas and contract checks
+    cover over 99% of the two-sided liquidity on each. Other chains work; those two are the ones
+    the numbers have been tested against. <a href="docs.html">How to read it →</a></p>
 
     <div class="searchbar">
       <input id="poolUrl" type="text" spellcheck="false" autocomplete="off"
