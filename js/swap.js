@@ -213,13 +213,34 @@ LP.swap = (function () {
    * Rough by nature -- gas moves with the network -- but the order of magnitude is what decides
    * whether a small position is viable at all, and between chains that spans four of them.
    */
+  /*
+   * What a full LP round trip costs in gas: approve, add liquidity, remove liquidity, about
+   * 450,000 gas all in.
+   *
+   * These were measured against public RPCs on 2026-10-13 rather than remembered, because the
+   * previous numbers were from an older gas regime and every one of them was badly stale --
+   * Ethereum read $60 against a measured $0.25, Base $0.50 against $0.007, BSC $1.20 against
+   * $0.017. On the cheap chains that error has a direction that matters: it told people a small
+   * position was not worth opening when entering and leaving costs less than a cent.
+   *
+   * Measured (450k gas, native token at that day's price):
+   *   eth $0.25 at 0.21 gwei | base $0.007 | bsc $0.017 | arbitrum $0.023
+   *   optimism $0.001 | polygon $0.029 | avax $0.044
+   *
+   * The values below sit above those measurements on purpose. Gas is not a constant, Ethereum
+   * least of all -- it was sampled four times over a minute here and sat at 0.2 gwei, but the
+   * same chain reaches fifty times that when it is busy. So these are typical-to-busy estimates
+   * rather than the quiet-hour floor, and the execution panel lets you type the real number in
+   * when you know it. Chains not in the measured list are scaled to their peers and are
+   * estimates, not observations.
+   */
   const GAS_ROUND_TRIP = {
-    eth: 60, ethereum: 60,
-    arbitrum: 0.8, optimism: 0.6, base: 0.5, zksync: 0.6, linea: 0.9, scroll: 0.7,
-    blast: 0.5, mantle: 0.4, mode: 0.4, unichain: 0.5, ink: 0.4, soneium: 0.4,
-    polygon_pos: 0.1, bsc: 1.2, avax: 1.0, ftm: 0.1, sonic: 0.1, xdai: 0.05,
-    celo: 0.05, berachain: 0.4, hyperevm: 0.3, monad: 0.1,
-    solana: 0.02, 'sui-network': 0.02, aptos: 0.02, tron: 2.0
+    eth: 4, ethereum: 4,
+    arbitrum: 0.05, optimism: 0.03, base: 0.05, zksync: 0.08, linea: 0.10, scroll: 0.08,
+    blast: 0.05, mantle: 0.05, mode: 0.04, unichain: 0.05, ink: 0.04, soneium: 0.04,
+    polygon_pos: 0.05, bsc: 0.05, avax: 0.10, ftm: 0.03, sonic: 0.03, xdai: 0.02,
+    celo: 0.02, berachain: 0.05, hyperevm: 0.05, monad: 0.03,
+    solana: 0.01, 'sui-network': 0.01, aptos: 0.01, tron: 1.5
   };
 
   const gasFor = (network) => {

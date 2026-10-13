@@ -55,7 +55,9 @@ LP.fees = (function () {
     {
       // Aerodrome/Velodrome Slipstream (and CL forks) are concentrated-liquidity pools that
       // still route fees to voters, so they need the range maths but a zero LP fee share.
-      test: /slipstream|(aerodrome|velodrome|thena|ramses|shadow)[-_]?(cl|v3)/i,
+      // Thena's Fusion and Integral are Algebra concentrated pools, not the v1 CPMM, and
+      // were falling through to the ve(3,3) CPMM profile below.
+      test: /slipstream|thena[-_]?(fusion|integral)|(aerodrome|velodrome|thena|ramses|shadow)[-_]?(cl|v3)/i,
       label: 've(3,3) concentrated pool', type: 'cl', fee: null, lpShare: 0.0,
       veModel: true,
       note: 'This is a concentrated-liquidity pool on a ve(3,3) DEX: swap fees go to veToken voters, not to LPs. LP return comes from token emissions instead, so the fee APR below reads ~0 by design. The range analysis still applies — going out of range still stops your emissions.'
@@ -125,6 +127,29 @@ LP.fees = (function () {
     { test: /project-x|nest-cl/i, label: 'Hyperliquid concentrated DEX', type: 'cl', fee: null, lpShare: 1.0 },
     { test: /sparkdex/i, label: 'SparkDEX', type: 'cl', fee: null, lpShare: 1.0 },
     { test: /hyperswap/i, label: 'HyperSwap', type: 'cl', fee: null, lpShare: 1.0 },
+
+    /*
+     * Base and BSC specifically. Measured against the live dataset: these were the projects
+     * holding real two-sided TVL on those two chains with no profile of their own. Where a fee
+     * is not something I can state confidently it stays null and is read from the API or the
+     * pool name instead of being invented.
+     */
+    { test: /wombat/i, label: 'Wombat Exchange', type: 'stable', fee: null, lpShare: 1.0,
+      note: 'A single-sided stableswap: deposits are one token and the pool rebalances, so the ' +
+        '50/50 constant-product impermanent loss used here does not describe it.' },
+    { test: /biswap/i, label: 'Biswap', type: 'cpmm', fee: 0.10, lpShare: 1.0 },
+    { test: /baseswap/i, label: 'BaseSwap', type: 'cpmm', fee: 0.30, lpShare: 1.0 },
+    { test: /alienbase/i, label: 'AlienBase', type: 'cpmm', fee: 0.30, lpShare: 1.0 },
+    { test: /apeswap/i, label: 'ApeSwap', type: 'cpmm', fee: 0.20, lpShare: 1.0 },
+    { test: /mdex/i, label: 'MDEX', type: 'cpmm', fee: 0.30, lpShare: 1.0 },
+    { test: /nomiswap/i, label: 'Nomiswap', type: 'cpmm', fee: 0.10, lpShare: 1.0 },
+    { test: /squadswap/i, label: 'SquadSwap', type: 'cpmm', fee: null, lpShare: 1.0 },
+    { test: /goose-?finance/i, label: 'Goose Finance', type: 'cpmm', fee: 0.20, lpShare: 1.0 },
+    { test: /velocimeter/i, label: 'Velocimeter', type: 'cpmm', fee: null, lpShare: 0.0,
+      veModel: true,
+      note: 'A ve(3,3) DEX: swap fees go to veToken voters rather than to LPs, so the fee APR ' +
+        'reads near zero by design and the real return is emissions.' },
+    { test: /kyberswap/i, label: 'KyberSwap Elastic', type: 'cl', fee: null, lpShare: 1.0 },
     { test: /pharaoh/i, label: 'Pharaoh', type: 'cl', fee: null, lpShare: 0.0, veModel: true,
       note: 'A ve(3,3) concentrated DEX: swap fees go to veToken voters rather than to LPs, so the fee APR reads near zero by design and the real return is emissions.' },
     { test: /osmosis/i, label: 'Osmosis', type: 'weighted', fee: null, lpShare: 1.0,
