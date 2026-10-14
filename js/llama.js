@@ -45,9 +45,9 @@ LP.llama = (function () {
     monad: 'Monad', ink: 'Ink', taiko: 'Taiko', 'zora-network': 'Zora',
     'world-chain': 'World Chain',
     soneium: 'Soneium', fraxtal: 'Fraxtal', kava: 'Kava', ronin: 'Ronin',
-    solana: 'Solana', 'sui-network': 'Sui', aptos: 'Aptos', 'sei-v2': 'Sei',
+    solana: 'Solana', 'sui-network': 'Sui', aptos: 'Aptos', 'sei-network': 'Sei',
     'polygon-zkevm': 'Polygon zkEVM', tron: 'Tron', pulsechain: 'PulseChain',
-    osmosis: 'Osmosis', starknet: 'Starknet', ton: 'TON', flare: 'Flare',
+    osmosis: 'Osmosis', 'starknet-alpha': 'Starknet', ton: 'TON', flare: 'Flare',
     katana: 'Katana', plasma: 'Plasma', abstract: 'Abstract'
   };
 

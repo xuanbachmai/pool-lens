@@ -45,7 +45,7 @@ LP.merkl = (function () {
     eth: 1, optimism: 10, flare: 14, bsc: 56, xdai: 100, unichain: 130,
     polygon_pos: 137, monad: 143, sonic: 146, ftm: 250, fraxtal: 252,
     zksync: 324, 'world-chain': 480, hyperevm: 999, 'polygon-zkevm': 1101,
-    glmr: 1284, 'sei-v2': 1329, soneium: 1868, ronin: 2020, mantle: 5000,
+    glmr: 1284, 'sei-network': 1329, soneium: 1868, ronin: 2020, mantle: 5000,
     base: 8453, plasma: 9745, mode: 34443, arbitrum: 42161, celo: 42220,
     avax: 43114, ink: 57073, linea: 59144, berachain: 80094, blast: 81457,
     taiko: 167000, scroll: 534352, katana: 747474

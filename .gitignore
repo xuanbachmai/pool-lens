@@ -25,3 +25,4 @@ node_modules/
 # captured DefiLlama snapshot for tests (regenerate with npm run test:fixture)
 test/fixtures/
 backtest/data/
+tools/refresh-report.md

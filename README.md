@@ -71,6 +71,47 @@ Things the demo makes concrete, all computed live rather than asserted:
   which is ±f/(1−f). Set the fee to zero and it collapses to a point.
 - The same 20 ETH trade costs **25.4% in a 100 ETH pool and 2.3% in a 1,000 ETH pool**.
 
+## Keeping itself current
+
+Several things here are snapshots that drift: the project-to-category map, the per-chain gas
+estimates, the chain name mappings, the DEX fee profiles. `tools/refresh.mjs` runs weekly in
+Actions and splits the problem in two.
+
+**Updated automatically.** The category map is a mechanical join on project slug with no
+judgement in it, so it is regenerated and committed. The regeneration replaces only the generated
+parts of the file, which is tested — the hand-written grouping helpers survive it.
+
+**Reported for a human.** New chains, new DEXes above $2M, and gas drift each open an issue
+instead, updated in place so a weekly job cannot bury the repository. These need a decision a
+script would get wrong: adding a chain means picking the exact DefiLlama name, and adding a DEX
+profile means deciding constant-product versus concentrated, which decides which maths runs. A
+wrong guess there fails *silently*, which is worse than the gap it was meant to close.
+
+### What it found on the first run
+
+GeckoTerminal indexes 226 networks and 47 were mapped, which is expected. The useful part was
+four suspected key mismatches — ids that look mapped and resolve nothing — of which two were
+real, verified live:
+
+| our key | GeckoTerminal | |
+| --- | --- | --- |
+| `starknet` | **404** — it serves `starknet-alpha` | $165M of pools, invisible |
+| `sei-v2` | **404** — it serves `sei-network` | invisible |
+| `sonic` | 200, and `sonic-svm` is a different chain | false positive, correctly cleared |
+
+That is the same silent failure as the “OP Mainnet” bug: a near-miss key 404s on the pool
+lookup, so the chain simply never resolves and nothing reports an error. Both are fixed, in
+`llama.js`, `merkl.js` and `parse.js`, with a test pinning the spellings.
+
+### Three sources added for the discovery
+
+- **GeckoTerminal `/networks`** — the authoritative list of chains it indexes, which is what
+  makes “which chains are we missing” answerable at all.
+- **DefiLlama `/v2/chains`** — TVL per chain, so the gaps are ranked by what they are worth
+  rather than listed alphabetically.
+- **Public RPCs** — `eth_gasPrice` across seven chains, so gas drift is measured rather than
+  remembered.
+
 ## Is this pool real?
 
 Every other panel assumes the pool is what it claims and asks whether it pays. For anything

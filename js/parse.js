@@ -29,7 +29,7 @@ LP.parse = (function () {
     solana: 'solana', sol: 'solana',
     sui: 'sui-network', 'sui-network': 'sui-network',
     aptos: 'aptos',
-    sei: 'sei-v2', 'sei-network': 'sei-v2'
+    sei: 'sei-network', starknet: 'starknet-alpha'
   };
 
   /* Numeric chainId -> GeckoTerminal network id (Pendle and others put ?chainId= in the URL). */

@@ -205,4 +205,27 @@ suite('llama freshness');
   check('the data is still usable afterwards', M.count() === 1 && M.rows().length === 1);
 }
 
+/*
+ * Chain keys that were silently dead.
+ *
+ * The CHAINS keys are GeckoTerminal network ids, and a wrong one does not error -- it 404s on
+ * the pool lookup and the chain simply never resolves, which is how "OP Mainnet" hid for a
+ * while and how these two did. Verified live against GeckoTerminal when corrected: starknet
+ * 404s and starknet-alpha returns 200; sei-v2 404s and sei-network returns 200.
+ *
+ * Offline this can only pin the known-good spellings. tools/refresh.mjs does the live check on
+ * a schedule and reports anything that drifts.
+ */
+suite('llama chain keys verified against GeckoTerminal');
+check('Starknet uses the id GeckoTerminal actually serves',
+  L.CHAINS['starknet-alpha'] === 'Starknet' && L.CHAINS.starknet === undefined,
+  'has starknet-alpha: ' + !!L.CHAINS['starknet-alpha'] + ', stale starknet: ' + !!L.CHAINS.starknet);
+check('Sei uses the id GeckoTerminal actually serves',
+  L.CHAINS['sei-network'] === 'Sei' && L.CHAINS['sei-v2'] === undefined,
+  'has sei-network: ' + !!L.CHAINS['sei-network'] + ', stale sei-v2: ' + !!L.CHAINS['sei-v2']);
+check('Sonic and Sonic SVM are not confused for each other',
+  L.CHAINS.sonic === 'Sonic' && L.CHAINS['sonic-svm'] === undefined);
+check('no chain key is empty or whitespace',
+  Object.keys(L.CHAINS).every((k) => k.trim().length > 1));
+
 report();

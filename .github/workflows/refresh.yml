@@ -1,0 +1,78 @@
+# Keeps the baked data current and reports what it cannot fix by itself.
+#
+# Two outcomes, deliberately separated:
+#   - js/categories.js is regenerated and committed. It is a mechanical join with no judgement
+#     in it, so an automatic update is always safe.
+#   - New chains, new DEXes and gas drift open an issue instead. Each needs a decision a script
+#     would get wrong, and a wrong chain name fails silently rather than loudly, which is worse
+#     than the gap it was meant to close.
+#
+# Runs weekly. Offset off the hour because GitHub deprioritises scheduled jobs and the queue is
+# worst at :00 — the alerts workflow measured a median delay of about five hours at */30.
+
+name: Refresh data
+
+on:
+  schedule:
+    - cron: '23 6 * * 1'      # Mondays, early
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: data-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # Exit code 2 means "a human needs to look", which is not a build failure.
+      - name: Refresh and check
+        id: refresh
+        run: |
+          set +e
+          node tools/refresh.mjs --write
+          code=$?
+          echo "attention=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -gt 2 ]; then exit "$code"; fi
+
+      - name: Make sure the app still works with the regenerated data
+        run: npm test
+
+      - name: Commit the regenerated category map
+        run: |
+          if [[ -n "$(git status --porcelain js/categories.js)" ]]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add js/categories.js
+            git commit -m "chore: refresh category map [skip ci]"
+            git push
+          else
+            echo "Category map unchanged."
+          fi
+
+      # One open issue at a time, updated in place, so a weekly job cannot bury the repository.
+      - name: Open or update the gaps issue
+        if: steps.refresh.outputs.attention == '2'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BODY=$(cat tools/refresh-report.md)
+          EXISTING=$(gh issue list --label data-gaps --state open --limit 1 --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            gh issue edit "$EXISTING" --body "$BODY"
+            echo "Updated issue #$EXISTING."
+          else
+            gh label create data-gaps --description "Chains, DEXes or gas needing a decision" --color FBCA04 --force || true
+            gh issue create --title "Data gaps: chains, DEXes and gas needing a decision" \
+              --label data-gaps --body "$BODY"
+          fi
