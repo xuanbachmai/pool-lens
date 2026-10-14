@@ -136,6 +136,7 @@ LP.academy = (function () {
           divergence. The position works when the fees exceed what the divergence costs, and the
           only way to know is to measure both.
         </div>`,
+      figure: 'impermanentLoss',
       takeaway: 'Judge every pool against holding the same two tokens. Fees, impermanent loss ' +
         'and fixed costs are the three forces, and only the comparison tells you who won.'
     },
@@ -341,6 +342,7 @@ LP.academy = (function () {
               moment it can be hundreds of dollars.</li>
           </ul>
         </div>`,
+      figure: 'costCurve',
       takeaway: 'Gas is fixed and slippage is not, so there is a floor below which a position ' +
         'cannot pay for itself. Your own deposit dilutes the yield you are buying.'
     },
@@ -456,9 +458,13 @@ LP.academy = (function () {
         </div>
 
         <h3>Capital efficiency is knowable in advance</h3>
-        <p>A geometric range four times wide gives exactly two times the capital efficiency of
-        full range. The <a href="amm.html">AMM demo</a> lets you check that by hand rather than
-        taking it on trust.</p>
+        <p>A range running from a quarter of the current price to four times it — written
+        <code>P/4</code> to <code>4P</code> — is exactly twice as capital-efficient as full
+        range. The <a href="amm.html">AMM demo</a> lets you check that by hand rather than taking
+        it on trust.</p>
+        <p class="fine">Worth stating precisely, because "a four-times range" is ambiguous: it
+        can mean four times either side of the price, as here, or a span four times wide, which
+        is a different and much narrower range.</p>
 
         <div class="cal">
           <h4>Decide</h4>
@@ -469,6 +475,7 @@ LP.academy = (function () {
               a management job, not a position — price the rebalancing gas into Chapter 5.</li>
           </ul>
         </div>`,
+      figure: 'rangeEfficiency',
       takeaway: 'Narrow ranges earn more and miss more. Judge them on volume-weighted time in ' +
         'range, and price the rebalancing you are signing up for.'
     },
@@ -660,7 +667,9 @@ LP.academy = (function () {
       <div class="ac-crumb">${esc(section ? section.title : '')}</div>
       <h1>${esc(c.title)}</h1>
       ${c.level ? `<div class="ac-level">Course level: <strong>${levelLabel[c.level]}</strong></div>` : ''}
-      <div class="ac-body">${c.body}</div>
+      <div class="ac-body">${c.body}${
+        c.figure && LP.academyFigures && LP.academyFigures[c.figure]
+          ? LP.academyFigures[c.figure]() : ''}</div>
       ${c.takeaway ? `<div class="cal cal-take"><h4>Takeaway</h4><p>${c.takeaway}</p></div>` : ''}
       <nav class="ac-pager">
         ${prev ? `<a href="#${prev}" class="prev"><span>Previous</span>${esc(CHAPTERS[prev].nav)}</a>`

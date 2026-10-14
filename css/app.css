@@ -773,3 +773,13 @@ th.sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2
 .hero-points strong { display: block; font-size: var(--t-sm); margin-bottom: 5px; }
 .hero-points span { display: block; font-size: var(--t-xs); color: var(--muted);
   line-height: 1.5; }
+
+/*
+ * Academy figures. Plotted from the formulas in js/academy-figures.js, so they inherit the
+ * theme tokens rather than baking colours in — both palettes work without a second drawing.
+ */
+.ac-fig { margin: 26px 0; }
+.ac-fig svg { width: 100%; height: auto; display: block;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.ac-fig figcaption { font-size: var(--t-xs); color: var(--muted); margin-top: 9px;
+  line-height: 1.5; max-width: 66ch; }
