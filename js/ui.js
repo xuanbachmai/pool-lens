@@ -36,8 +36,17 @@ LP.ui = (function () {
   }
 
   /** Forget the current pool so a failed lookup can never leave stale numbers on screen. */
+  /*
+   * The hero is a pitch, and once there is a result the pitch is in the way. Toggling a class
+   * on body lets CSS hide the figure and proof band rather than this file knowing about layout.
+   */
+  function setHasResult(on) {
+    document.body.classList.toggle('has-result', !!on);
+  }
+
   function clearResults() {
     $('#results').classList.add('hidden');
+    setHasResult(false);
     $('#results').innerHTML = '';
     state.pendle = null;
     state.pool = null; state.result = null; state.cross = null; state.hist = [];
@@ -153,6 +162,7 @@ LP.ui = (function () {
 
       recompute();
       $('#results').classList.remove('hidden');
+      setHasResult(true);
     } catch (err) {
       clearResults();
       const isRate = err instanceof LP.api.RateLimitError;
@@ -200,6 +210,7 @@ LP.ui = (function () {
         setStatus(null);
         $('#results').innerHTML = LP.pendleUi.renderPage(state.pendle, net);
         $('#results').classList.remove('hidden');
+      setHasResult(true);
         wrapWideTables();
         return true;
       }
@@ -825,7 +836,14 @@ LP.ui = (function () {
   }
 
   function init() {
-    $('#analyzeBtn').addEventListener('click', () => analyze());
+    /*
+     * The input now sits in a form so a phone keyboard shows "go" and Enter behaves as people
+     * expect. A form submits and reloads unless stopped, so the submit handler is the one that
+     * matters -- the click handler would never run on Enter.
+     */
+    const heroForm = document.getElementById('heroSearch');
+    if (heroForm) heroForm.addEventListener('submit', (e) => { e.preventDefault(); analyze(); });
+    $('#analyzeBtn').addEventListener('click', (e) => { e.preventDefault(); analyze(); });
     $('#poolUrl').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); analyze(); }
     });

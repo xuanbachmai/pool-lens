@@ -12,50 +12,68 @@
 <body>
 <div class="wrap">
 
-  <header class="top">
-    <div class="nav">
+  <header class="hero">
+    <div class="topbar">
+      <a class="brand" href="index.html">Pool<span>Lens</span></a>
+      <nav class="topnav">
+        <a href="farm.html">Screener</a>
+        <a href="explore.html">Explore</a>
+        <a href="book.html">Book</a>
+        <span class="topnav-sep"></span>
+        <a href="academy.html">Academy</a>
+        <a href="docs.html">Docs</a>
+        <a href="amm.html">AMM demo</a>
+      </nav>
       <span class="nav-auth" id="authSlot"></span>
-      <span class="here">Pool analyser</span>
-      <a href="book.html">→ your book</a>
-      <a href="farm.html">→ farm screener</a>
-      <a href="explore.html">→ explore</a>
-      <a href="amm.html">→ how the AMM formula works</a>
-      <a href="docs.html">→ docs</a>
-      <a href="academy.html">→ academy</a>
-    </div>
-    <h1>Pool Lens</h1>
-    <p class="hero-lead">Paste any DEX pool and find out <strong>what it would actually have
-    paid you</strong> — after impermanent loss, after gas, measured against simply holding the
-    tokens. And whether the pool is real before any of that matters.</p>
-
-    <div class="hero-points">
-      <div><strong>Not the advertised APY</strong>
-        <span>A pool paying 40% in fees while the pair diverges 50% has lost you money. Every
-        figure here is stated against holding.</span></div>
-      <div><strong>Can you actually sell it?</strong>
-        <span>Honeypots, taxes, mint authority, wash-traded volume, and what it really costs to
-        get out — checked before the yield.</span></div>
-      <div><strong>Will the yield still be there?</strong>
-        <span>The median incentive campaign has 21 days left. Those get an end date, not an
-        annual rate.</span></div>
     </div>
 
-    <p class="fineprint">No wallet, no account, nothing to install. Verified on
-    <strong>Base</strong> and <strong>BSC</strong> first — fee models, gas and contract checks
-    cover over 99% of the two-sided liquidity on each. Other chains work; those two are the ones
-    the numbers have been tested against. <a href="docs.html">How to read it →</a></p>
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Liquidity pool analysis</p>
+        <h1>Most pools tell you the yield.<br>Almost none tell you if you won.</h1>
+        <p class="hero-lead">Paste any DEX pool. Find out what it would actually have paid
+        you &mdash; after impermanent loss, after gas, measured against simply holding the two
+        tokens. And whether the pool is real before any of that matters.</p>
 
-    <div class="searchbar">
-      <input id="poolUrl" type="text" spellcheck="false" autocomplete="off"
-        placeholder="https://app.uniswap.org/explore/pools/ethereum/0x88e6…  or just a pool address">
-      <button class="btn" id="analyzeBtn">Analyse pool</button>
+        <form class="hero-search" id="heroSearch">
+          <input id="poolUrl" type="text" spellcheck="false" autocomplete="off"
+            aria-label="Pool link or address"
+            placeholder="Paste a pool link, or an address">
+          <button class="btn" id="analyzeBtn" type="submit">Analyse</button>
+        </form>
+
+        <div class="examples">
+          <span>Try</span>
+          <a href="#" data-example="https://www.geckoterminal.com/base/pools/0x6c561b446416e1a00e8e93e221854d6ea4171372">WETH/USDC on Base</a>
+          <a href="#" data-example="https://www.geckoterminal.com/bsc/pools/0x172fcd41e0913e95784454622d1c3724f546f849">USDT/WBNB on BSC</a>
+          <a href="#" data-example="https://www.geckoterminal.com/base/pools/0xa43fe16908251ee70ef74718545e4fe6c5ccec9f">a memecoin</a>
+        </div>
+        <p class="hero-trust">No wallet. No account. Nothing to install.</p>
+      </div>
+
+      <div class="hero-figure" id="heroFigure" aria-hidden="false"></div>
     </div>
-    <div class="examples">
-      Try:
-      <a href="#" data-example="https://www.geckoterminal.com/base/pools/0x6c561b446416e1a00e8e93e221854d6ea4171372">WETH/USDC on Base</a>
-      <a href="#" data-example="https://www.geckoterminal.com/bsc/pools/0x172fcd41e0913e95784454622d1c3724f546f849">USDT/WBNB on BSC</a>
-      <a href="#" data-example="https://www.geckoterminal.com/base/pools/0xa43fe16908251ee70ef74718545e4fe6c5ccec9f">a memecoin pool</a>
-      <a href="#" data-example="https://app.uniswap.org/explore/pools/ethereum/0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640">WETH/USDC on Ethereum</a>
+
+    <!--
+      Three measured facts rather than three claims. Each is a number this project computed and
+      can show its working for, which is the differentiator stated as evidence.
+    -->
+    <div class="hero-proof">
+      <div>
+        <strong class="down">&minus;5.72%</strong>
+        <span>what a 2&times; price move costs you against holding, before a penny of fees.
+        Most dashboards never mention it.</span>
+      </div>
+      <div>
+        <strong>21 days</strong>
+        <span>median life left on an incentive campaign, across 366 we sampled. That APY is
+        not an annual rate.</span>
+      </div>
+      <div>
+        <strong>$0.007</strong>
+        <span>what a round trip really costs on Base, measured from the chain. Gas tables
+        everywhere else are years stale.</span>
+      </div>
     </div>
   </header>
 
@@ -82,6 +100,7 @@
 <script src="js/merkl.js"></script>
 <script src="js/profit.js"></script>
 <script src="js/integrity.js"></script>
+<script src="js/hero.js"></script>
 <script src="js/position.js"></script>
 <script src="js/strategy.js"></script>
 <script src="js/whatif.js"></script>

@@ -783,3 +783,94 @@ th.sortable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2
   background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
 .ac-fig figcaption { font-size: var(--t-xs); color: var(--muted); margin-top: 9px;
   line-height: 1.5; max-width: 66ch; }
+
+/* ===========================================================================
+ * Hero
+ *
+ * Replaces a stack of equal-weight blocks with one asymmetric composition: the
+ * thesis and the single action on the left, the thing the product is about on
+ * the right. The figure is the subject's own signature — a constant-product
+ * curve with the loss shaded — drawn from the real formula in js/hero.js, so
+ * it is content rather than ornament.
+ * ======================================================================== */
+
+/* A quieter top bar. Nine inline links competed with the headline; these are
+   grouped by what they are for and sized to stay out of the way. */
+.topbar { display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
+  padding: 18px 0 30px; }
+.brand { font-size: var(--t-lg); font-weight: 650; letter-spacing: -0.02em;
+  text-decoration: none; color: var(--text); }
+.brand span { color: var(--accent); }
+.topnav { display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  font-size: var(--t-xs); }
+.topnav a { color: var(--muted); text-decoration: none; }
+.topnav a:hover { color: var(--text); }
+.topnav-sep { width: 1px; height: 13px; background: var(--line); }
+.topbar .nav-auth { margin-left: auto; }
+
+.hero { padding-bottom: 8px; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 52px; align-items: center; }
+.hero-copy { min-width: 0; }
+
+.eyebrow { font-size: var(--t-2xs); text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--accent); margin: 0 0 14px; }
+
+.hero h1 { font-size: clamp(30px, 4.4vw, 46px); line-height: 1.1; letter-spacing: -0.03em;
+  font-weight: 650; margin: 0 0 18px; text-wrap: balance; }
+
+.hero .hero-lead { font-size: var(--t-lg); line-height: 1.55; color: var(--muted);
+  max-width: 54ch; margin: 0 0 26px; }
+
+/* One action, given the weight of one action. */
+.hero-search { display: flex; gap: 10px; max-width: 540px; }
+.hero-search input { flex: 1; min-width: 0; padding: 14px 16px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text);
+  font-size: var(--t-md); font-family: var(--mono); }
+.hero-search input::placeholder { font-family: var(--sans); color: var(--muted); }
+.hero-search input:focus { outline: 2px solid var(--accent); outline-offset: -1px;
+  border-color: var(--accent); }
+.hero-search .btn { padding: 14px 24px; flex: none; }
+
+.hero .examples { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  margin-top: 16px; font-size: var(--t-xs); }
+.hero .examples span { color: var(--muted); }
+.hero-trust { font-size: var(--t-xs); color: var(--muted); margin: 18px 0 0; }
+
+.hero-figure { min-width: 0; }
+.hero-figure svg { width: 100%; height: auto; display: block; }
+
+/* The proof band: measured figures, not adjectives. */
+.hero-proof { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 30px; margin-top: 54px; padding-top: 30px; border-top: 1px solid var(--line); }
+.hero-proof > div { min-width: 0; }
+.hero-proof strong { display: block; font-family: var(--mono); font-size: var(--t-3xl);
+  font-weight: 600; letter-spacing: -0.02em; margin-bottom: 8px; }
+.hero-proof .down { color: var(--bad); }
+.hero-proof span { display: block; font-size: var(--t-xs); color: var(--muted);
+  line-height: 1.55; max-width: 36ch; }
+
+/* Once there is a result, the hero stops competing with it. */
+body.has-result .hero-figure,
+body.has-result .hero-proof,
+body.has-result .hero-lead,
+body.has-result .hero-trust,
+body.has-result .eyebrow { display: none; }
+body.has-result .hero h1 { font-size: var(--t-2xl); margin-bottom: 14px; }
+body.has-result .hero-grid { grid-template-columns: 1fr; gap: 0; }
+
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 34px; }
+  .hero-figure { order: -1; }
+  .hero-proof { margin-top: 40px; gap: 24px; }
+}
+@media (max-width: 560px) {
+  .topbar { gap: 14px; padding-bottom: 22px; }
+  .topbar .nav-auth { margin-left: 0; }
+  .hero-search { flex-direction: column; }
+  .hero-search .btn { width: 100%; }
+  .hero-proof strong { font-size: var(--t-2xl); }
+}
+
+/* The current page in the unified nav: present but not a link. */
+.topnav .here { color: var(--text); font-weight: 600; }
