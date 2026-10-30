@@ -281,7 +281,14 @@ LP.portfolio = (function () {
     </div>`;
   }
 
+  /** The address panel sits above the saved book and is independent of it. */
+  function drawScan() {
+    const slot = document.getElementById('scanSlot');
+    if (slot && window.LP && LP.scanui) slot.innerHTML = LP.scanui.render();
+  }
+
   function init() {
+    if (window.LP && LP.scanui) { LP.scanui.mount(drawScan); drawScan(); }
     load();
     // Redraw when the session changes, so signing in opens the book without a reload.
     document.addEventListener('lp:auth', () => render());

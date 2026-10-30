@@ -18,7 +18,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.geckoterminal.com https://api.dexscreener.com https://yields.llama.fi https://api.gopluslabs.io; form-action 'none'; frame-ancestors 'none'; base-uri 'self'"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://api.geckoterminal.com https://api.dexscreener.com https://yields.llama.fi https://api.gopluslabs.io https://mainnet.base.org https://bsc-dataseed.binance.org https://ethereum-rpc.publicnode.com https://arbitrum-one-rpc.publicnode.com https://optimism-rpc.publicnode.com https://polygon-bor-rpc.publicnode.com; form-action 'none'; frame-ancestors 'none'; base-uri 'self'"
         }
       ]
     }

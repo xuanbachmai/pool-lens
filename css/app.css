@@ -874,3 +874,28 @@ body.has-result .hero-grid { grid-template-columns: 1fr; gap: 0; }
 
 /* The current page in the unified nav: present but not a link. */
 .topnav .here { color: var(--text); font-weight: 600; }
+
+/* ===========================================================================
+ * Address scan
+ * ======================================================================== */
+
+.scan-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.scan-controls input { flex: 1; min-width: 240px; padding: 11px 13px; border-radius: 9px;
+  border: 1px solid var(--line); background: var(--card-2); color: var(--text);
+  font-family: var(--mono); font-size: var(--t-sm); }
+.scan-controls input::placeholder { font-family: var(--sans); color: var(--muted); }
+.scan-controls select { padding: 11px 12px; border-radius: 9px; border: 1px solid var(--line);
+  background: var(--card-2); color: var(--text); font-size: var(--t-sm); }
+.scan-controls .btn { flex: none; padding: 11px 20px; }
+
+.scan-connect { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin-top: 12px; }
+.scan-connect .fineprint { margin: 0; }
+.scan-progress { margin-top: 14px; }
+.scan-error { color: var(--bad); font-size: var(--t-xs); margin-top: 12px; }
+
+@media (max-width: 560px) {
+  .scan-controls { flex-direction: column; }
+  .scan-controls input { min-width: 0; }
+  .scan-controls .btn { width: 100%; }
+}
