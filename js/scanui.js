@@ -28,6 +28,25 @@ LP.scanui = (function () {
     error: null
   };
 
+  /*
+   * Links into the analyser.
+   *
+   * It deep-links on ?url= and parses GeckoTerminal URLs, which carry the chain. The first
+   * version of this pointed at ?pool=&chain=, parameters nothing reads, so every link landed on
+   * an empty analyser.
+   */
+  const poolLink = (chain, address) => 'index.html?url=' +
+    encodeURIComponent('https://www.geckoterminal.com/' + chain + '/pools/' + address);
+
+  /*
+   * A concentrated position carries its two tokens but not the pool address, which lives behind
+   * a CREATE2 hash this page cannot compute. The token link is honest about that: the analyser
+   * resolves a token to its deepest pool and offers a picker for the rest, so it lands you in
+   * the right place without claiming to be the exact position.
+   */
+  const tokenLink = (chain, token) => 'index.html?url=' +
+    encodeURIComponent('https://www.geckoterminal.com/' + chain + '/tokens/' + token);
+
   /* ------------------------------------------------------------------ render */
 
   function render() {
@@ -96,7 +115,7 @@ LP.scanui = (function () {
       <h4>Concentrated positions</h4>
       <div class="table-scroll"><table>
         <thead><tr><th>Pair</th><th>DEX</th><th class="num">Fee</th><th class="num">Range (ticks)</th>
-          <th class="num">Liquidity</th><th>Fees owed</th></tr></thead>
+          <th class="num">Liquidity</th><th>Fees owed</th><th></th></tr></thead>
         <tbody>${conc.map((p) => `<tr>
           <td><strong>${esc(p.pair || (p.symbol0 + ' / ' + p.symbol1))}</strong>
             <div class="sc-sub">#${esc(p.tokenId)}</div></td>
@@ -105,6 +124,7 @@ LP.scanui = (function () {
           <td class="num">${p.tickLower} … ${p.tickUpper}</td>
           <td class="num">${esc(shortNum(p.liquidity))}</td>
           <td>${p.owedFees ? '<span class="up">uncollected</span>' : '<span class="muted">none</span>'}</td>
+          <td><a href="${tokenLink(p.chain, p.token0)}">find pool →</a></td>
         </tr>`).join('')}</tbody>
       </table></div>` : ''}
 
@@ -116,7 +136,7 @@ LP.scanui = (function () {
           <td><strong>${esc(p.symbol || p.pool)}</strong></td>
           <td class="num">${esc(shortNum(p.balance))}</td>
           <td class="num">${u.usd(p.tvlUsd)}</td>
-          <td><a href="index.html?pool=${encodeURIComponent(p.pool)}&chain=${encodeURIComponent(p.chain)}">analyse →</a></td>
+          <td><a href="${poolLink(p.chain, p.pool)}">analyse →</a></td>
         </tr>`).join('')}</tbody>
       </table></div>` : ''}
 

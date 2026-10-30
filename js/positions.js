@@ -148,7 +148,7 @@ LP.positions = (function () {
    * closed and are dropped — the NFT survives a withdrawal, so counting them would report
    * positions somebody has already exited.
    */
-  async function scanConcentrated(chain, owner, onProgress) {
+  async function scanConcentrated(chain, owner, onProgress, errors) {
     const managers = MANAGERS[chain] || [];
     if (!managers.length) return [];
     const found = [];
@@ -158,7 +158,16 @@ LP.positions = (function () {
       let counts;
       try {
         counts = await batchCall(chain, [{ to: m.address, data: SEL.balanceOf + padAddr(owner) }]);
-      } catch (e) { continue; }
+      } catch (e) {
+        /*
+         * Skipping quietly was a bug of exactly the kind this module is supposed to avoid: a
+         * rate-limited RPC made the manager disappear, and the scan then reported "nothing
+         * found" for an address that might hold a great deal. A manager that could not be
+         * read is not a manager with no positions, and the difference is the whole point.
+         */
+        if (errors) errors.push(m.name + ' could not be read: ' + (e.message || e));
+        continue;
+      }
       const count = counts[0] ? Number(toBig(word(counts[0], 0))) : 0;
       if (!count) continue;
 
@@ -349,7 +358,7 @@ LP.positions = (function () {
     let lp = { found: [], checked: 0 };
 
     try {
-      concentrated = await scanConcentrated(chain, owner, onProgress);
+      concentrated = await scanConcentrated(chain, owner, onProgress, errors);
     } catch (e) { errors.push('Concentrated positions: ' + (e.message || e)); }
 
     try {
