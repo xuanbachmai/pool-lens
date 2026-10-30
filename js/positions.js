@@ -222,15 +222,33 @@ LP.positions = (function () {
    */
   const poolCache = new Map();
 
-  async function candidatePools(chain, pages = 3) {
+  /*
+   * Only a complete sweep is remembered.
+   *
+   * This used to cache whatever it had managed to fetch when a page failed, which turned one
+   * rate-limited request into a permanently narrower search: every later scan of that chain
+   * reused the short list, checked a third of the pools, and said nothing about why. It is
+   * exactly the mistake the symbol cache made further down -- remember successes, never
+   * failures -- so it gets the same rule, and a partial page now says so out loud instead of
+   * quietly shrinking the search.
+   */
+  async function candidatePools(chain, pages = 3, errors) {
     if (poolCache.has(chain)) return poolCache.get(chain);
     const out = [];
+    let complete = true;
     for (let page = 1; page <= pages; page++) {
       try {
         const res = await fetch('https://api.geckoterminal.com/api/v2/networks/' +
           encodeURIComponent(chain) + '/pools?page=' + page + '&sort=h24_volume_usd_desc',
           { headers: { accept: 'application/json' } });
-        if (!res.ok) break;
+        if (!res.ok) {
+          complete = false;
+          if (errors) {
+            errors.push('The pool list stopped at page ' + page + ' (HTTP ' + res.status +
+              '), so the LP sweep covered fewer pools than usual.');
+          }
+          break;
+        }
         const j = await res.json();
         for (const r of (j.data || [])) {
           const a = r.attributes || {};
@@ -239,10 +257,29 @@ LP.positions = (function () {
             out.push({ address: a.address, name: a.name, tvlUsd: parseFloat(a.reserve_in_usd) || 0 });
           }
         }
-      } catch (e) { break; }
-      await new Promise((r) => setTimeout(r, 1100));   // the free tier allows ~30 a minute
+      } catch (e) {
+        /*
+         * GeckoTerminal sends no CORS header on a rejected request, so the browser rejects the
+         * fetch outright and the 429 never arrives as a status. An opaque failure here is
+         * therefore the rate limit far more often than it is the network.
+         */
+        complete = false;
+        if (errors) {
+          errors.push('The pool list could not be read past page ' + page +
+            ', which is usually the data provider\'s rate limit. The LP sweep covered fewer ' +
+            'pools than usual; try again in a minute for the full set.');
+        }
+        break;
+      }
+      /*
+       * Spacing, not a rate. Measured against the live endpoint, three to five requests get
+       * through from a rested start and the gap between them barely matters, so this delay is
+       * not what keeps the scan inside the limit -- using few pages is. It is kept so a scan
+       * does not fire its pages as one burst.
+       */
+      await new Promise((r) => setTimeout(r, 1100));
     }
-    poolCache.set(chain, out);
+    if (complete) poolCache.set(chain, out);
     return out;
   }
 
@@ -253,8 +290,8 @@ LP.positions = (function () {
    * reports how many it checked. A position in a pool outside the busiest few dozen will not be
    * found, which the UI says rather than implying the list is complete.
    */
-  async function scanLpTokens(chain, owner, onProgress) {
-    const candidates = await candidatePools(chain);
+  async function scanLpTokens(chain, owner, onProgress, errors) {
+    const candidates = await candidatePools(chain, 3, errors);
     if (!candidates.length) return { found: [], checked: 0 };
 
     if (onProgress) onProgress('Checking ' + candidates.length + ' pools for LP tokens…');
@@ -362,7 +399,7 @@ LP.positions = (function () {
     } catch (e) { errors.push('Concentrated positions: ' + (e.message || e)); }
 
     try {
-      lp = await scanLpTokens(chain, owner, onProgress);
+      lp = await scanLpTokens(chain, owner, onProgress, errors);
     } catch (e) { errors.push('LP tokens: ' + (e.message || e)); }
 
     // Name the tokens, so the list reads as pairs rather than as hex.

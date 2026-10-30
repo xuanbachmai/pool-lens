@@ -48,8 +48,50 @@ LP.llama = (function () {
     solana: 'Solana', 'sui-network': 'Sui', aptos: 'Aptos', 'sei-network': 'Sei',
     'polygon-zkevm': 'Polygon zkEVM', tron: 'Tron', pulsechain: 'PulseChain',
     osmosis: 'Osmosis', 'starknet-alpha': 'Starknet', ton: 'TON', flare: 'Flare',
-    katana: 'Katana', plasma: 'Plasma', abstract: 'Abstract'
+    katana: 'Katana', plasma: 'Plasma', abstract: 'Abstract',
+
+    /*
+     * Added 2026-10-30, from the gaps the refresher reports. Each name was taken from the
+     * yields dataset and not from /v2/chains, because the two disagree and only one of them
+     * matters here: the chain list calls X Layer "X Layer", while every pool on it is filed
+     * under "Xlayer". The space would have matched nothing, in the silent way this comment
+     * keeps warning about.
+     *
+     * Rootstock arrives under two names at once -- 'Rootstock' and 'RSK', six pools and seven
+     * -- so its value is a list. As a single string it would have reached about half the chain
+     * and looked entirely healthy doing it.
+     */
+    'x-layer': 'Xlayer', rootstock: ['Rootstock', 'RSK'], tempo: 'Tempo',
+    mezo: 'Mezo', pharos: 'Pharos',
+
+    /*
+     * Not EVM chains, and mapped anyway. Nothing in this table needs them to be: it exists so
+     * a GeckoTerminal pool can find its DefiLlama row, which is a name lookup. Solana, Sui,
+     * Aptos, Tron, TON and Osmosis have been in here on that basis for a while.
+     *
+     * Two chains larger than all of these were deliberately left out -- Arc at $576M and
+     * Anubis at $309M. Both hold real money and neither has a single pool in the yields data,
+     * so a mapping would match nothing while looking perfectly healthy. The refresher prints a
+     * pool count beside every candidate now precisely so that stays visible.
+     */
+    xrpl: 'XRPL', stellar: 'Stellar', near: 'Near', stacks: 'Stacks', cardano: 'Cardano'
   };
+
+  /**
+   * The DefiLlama chain names for a GeckoTerminal network id, always as a list.
+   *
+   * One chain can be filed under several names, so a mapping may hold a string or an array and
+   * every reader comes through here rather than touching CHAINS directly.
+   */
+  const llamaNames = (network) => {
+    const v = CHAINS[network];
+    if (v === undefined) return [];
+    return Array.isArray(v) ? v : [v];
+  };
+
+  /** Every name we map, flattened -- for coverage checks. */
+  const llamaNamesAll = () => Object.keys(CHAINS).reduce(
+    (all, k) => all.concat(llamaNames(k)), []);
 
   const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -312,10 +354,11 @@ LP.llama = (function () {
   function matchPool(result) {
     if (!cache) return { ok: false, reason: 'not loaded' };
     const pool = result.pool;
-    const chain = CHAINS[pool.network];
-    if (!chain) {
+    const names = llamaNames(pool.network);
+    if (!names.length) {
       return { ok: false, reason: 'No DefiLlama chain mapping for "' + pool.network + '".' };
     }
+    const chain = names.join('" or "');   // for the message only; matching uses the list
 
     const baseAddr = tokenAddr(pool.baseTokenId, pool.network);
     const quoteAddr = tokenAddr(pool.quoteTokenId, pool.network);
@@ -325,7 +368,7 @@ LP.llama = (function () {
 
     const want = new Set([baseAddr, quoteAddr]);
     let cands = rows().filter((p) => {
-      if (p.chain !== chain) return false;
+      if (!names.includes(p.chain)) return false;
       if (p.underlying.length !== 2) return false;
       return p.underlying.every((t) => want.has(t)) && new Set(p.underlying).size === 2;
     });
@@ -514,5 +557,5 @@ LP.llama = (function () {
 
   return { load, isLoaded, count, loadedAt, ageSeconds, refresh, chart, breakdown,
            rows, screen, matchPool, shape, enrich, rewardShare,
-           vrRatio, confidence, chains, CHAINS };
+           vrRatio, confidence, chains, CHAINS, llamaNames, llamaNamesAll };
 })();

@@ -147,10 +147,18 @@ realNames.forEach((n) => realByNorm.set(normalise(n), n));
 
 const nearMisses = [];
 const exact = [];
-for (const [gt, name] of Object.entries(L.CHAINS)) {
-  if (realNames.has(name)) { exact.push(gt); continue; }
-  const hit = realByNorm.get(normalise(name));
-  if (hit) nearMisses.push(gt + ': we send "' + name + '", data has "' + hit + '"');
+/*
+ * Flattened through llamaNames, because a mapping may hold more than one name. Iterating the
+ * raw values compares an array against a string: no match, and no near miss either, so the
+ * aliased chains fall out of both counts and the test goes on passing while covering less. A
+ * coverage check that silently stops covering is the worst thing in this file.
+ */
+for (const gt of Object.keys(L.CHAINS)) {
+  for (const name of L.llamaNames(gt)) {
+    if (realNames.has(name)) { exact.push(gt + ' -> ' + name); continue; }
+    const hit = realByNorm.get(normalise(name));
+    if (hit) nearMisses.push(gt + ': we send "' + name + '", data has "' + hit + '"');
+  }
 }
 check('no mapping differs from a real chain name by case or punctuation only',
   nearMisses.length === 0, nearMisses.join('; '));
@@ -161,12 +169,12 @@ check('Optimism maps to the name DefiLlama actually uses',
   realNames.has(L.CHAINS.optimism), 'sends "' + L.CHAINS.optimism + '"');
 check('the chains with the most pools are all mapped',
   (() => {
-    const mapped = new Set(Object.values(L.CHAINS));
+    const mapped = new Set(L.llamaNamesAll());
     const top = L.chains().slice(0, 8).filter((c) => !mapped.has(c.chain));
     return top.length === 0 || (nearMisses.length === 0 && top.every((c) => c.n < 200));
   })(),
   'unmapped in the top 8: ' + L.chains().slice(0, 8)
-    .filter((c) => !new Set(Object.values(L.CHAINS)).has(c.chain))
+    .filter((c) => !new Set(L.llamaNamesAll()).has(c.chain))
     .map((c) => c.chain + ' (' + c.n + ')').join(', '));
 
 /*
@@ -227,5 +235,68 @@ check('Sonic and Sonic SVM are not confused for each other',
   L.CHAINS.sonic === 'Sonic' && L.CHAINS['sonic-svm'] === undefined);
 check('no chain key is empty or whitespace',
   Object.keys(L.CHAINS).every((k) => k.trim().length > 1));
+
+/*
+ * Aliases, and the spellings they exist to protect.
+ *
+ * Two traps are pinned here. The first is that DefiLlama's chain LIST and its yields data
+ * disagree: /v2/chains says "X Layer", every pool on the chain says "Xlayer". Only the second
+ * is ever compared against, so the tidier-looking spelling is the broken one and someone will
+ * eventually be tempted to "fix" it.
+ *
+ * The second is that one chain can be filed under several names at once -- Rootstock appears as
+ * both 'Rootstock' and 'RSK' -- so a single string reaches part of the chain and reports
+ * nothing wrong about the rest.
+ */
+suite('llama chain aliases');
+check('a plain mapping gives one name', L.llamaNames('base').length === 1);
+check('an aliased mapping gives all of them',
+  L.llamaNames('rootstock').includes('Rootstock') && L.llamaNames('rootstock').includes('RSK'),
+  L.llamaNames('rootstock').join(', '));
+check('an unmapped network gives an empty list rather than undefined',
+  Array.isArray(L.llamaNames('not-a-chain')) && L.llamaNames('not-a-chain').length === 0);
+check('X Layer keeps the spelling the pool data uses, not the one the chain list shows',
+  L.CHAINS['x-layer'] === 'Xlayer', JSON.stringify(L.CHAINS['x-layer']));
+check('every flattened name is a non-empty string',
+  L.llamaNamesAll().every((n) => typeof n === 'string' && n.length > 0));
+check('flattening yields at least one name per mapping',
+  L.llamaNamesAll().length >= Object.keys(L.CHAINS).length);
+{
+  // Each newly added chain should actually find pools in the captured dataset.
+  const counts = new Map();
+  L.chains().forEach((c) => counts.set(c.chain, c.n));
+  const added = ['x-layer', 'rootstock', 'tempo', 'mezo', 'pharos',
+                 'xrpl', 'stellar', 'near', 'stacks', 'cardano'];
+  const dead = added.filter((k) =>
+    L.llamaNames(k).reduce((n, name) => n + (counts.get(name) || 0), 0) === 0);
+  check('every chain added in this pass has pools behind it', dead.length === 0,
+    'nothing found for: ' + dead.join(', '));
+}
+{
+  /*
+   * The alias list earning its keep: a pool filed under the SECOND name still has to match.
+   * With a single string this returned "DefiLlama does not track a pool for this pair".
+   */
+  const LP3 = loadLP(['util', 'llama'], {
+    fetch: async () => ({ ok: true, status: 200, json: async () => ({ data: [{
+      pool: 'rsk-1', project: 'sushiswap', chain: 'RSK', symbol: 'A-B',
+      tvlUsd: 1e6, apy: 5, apyBase: 5, apyReward: null,
+      underlyingTokens: ['0xAAAA', '0xBBBB']
+    }] }) })
+  });
+  await LP3.llama.load();
+  const m = LP3.llama.matchPool({
+    pool: { network: 'rootstock', dexId: 'sushiswap', tvlUsd: 0,
+            baseTokenId: 'rootstock_0xaaaa', quoteTokenId: 'rootstock_0xbbbb' }
+  });
+  check('a pool filed under the second alias is found', m.ok, JSON.stringify(m));
+  check('and an unmapped network still says so plainly', (() => {
+    const bad = LP3.llama.matchPool({
+      pool: { network: 'not-a-chain', dexId: 'x', tvlUsd: 0,
+              baseTokenId: 'a_0x1', quoteTokenId: 'a_0x2' }
+    });
+    return !bad.ok && /No DefiLlama chain mapping/.test(bad.reason);
+  })());
+}
 
 report();

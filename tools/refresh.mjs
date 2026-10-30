@@ -127,11 +127,37 @@ for (const page of [1, 2, 3]) {
 const tvlByName = new Map(llamaChains.map((c) => [String(c.name).toLowerCase(), c.tvl || 0]));
 const mapped = LP.llama.CHAINS;
 
+/*
+ * The name that has to go into CHAINS comes from the YIELDS data, not from /v2/chains. The two
+ * disagree, and only one of them is ever matched against: the chain list calls X Layer
+ * "X Layer", while every pool on that chain is filed under "Xlayer".
+ *
+ * This report used to print the chain-list name beside an instruction to copy it exactly, which
+ * is the most expensive kind of wrong -- advice that produces a mapping that looks right and
+ * matches nothing. The pool count below is the proof: a name with no pools behind it is not the
+ * name to use.
+ */
+const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const yieldsByNorm = new Map();
+for (const p of pools) {
+  const k = norm(p.chain);
+  if (!yieldsByNorm.has(k)) yieldsByNorm.set(k, { names: new Set(), n: 0 });
+  const e = yieldsByNorm.get(k);
+  e.names.add(p.chain);
+  e.n++;
+}
+
 const unmapped = [];
 for (const n of gtNets) {
   if (mapped[n.id]) continue;
   const name = n.attributes?.name || n.id;
-  unmapped.push({ id: n.id, name, tvl: tvlByName.get(String(name).toLowerCase()) || 0 });
+  const y = yieldsByNorm.get(norm(name));
+  unmapped.push({
+    id: n.id, name,
+    tvl: tvlByName.get(String(name).toLowerCase()) || 0,
+    yieldsNames: y ? [...y.names] : [],
+    nPools: y ? y.n : 0
+  });
 }
 unmapped.sort((a, b) => b.tvl - a.tvl);
 
@@ -144,7 +170,14 @@ say(`GeckoTerminal indexes ${gtNets.length} networks; ${Object.keys(mapped).leng
 const ourKeys = Object.keys(mapped);
 const nearMiss = unmapped.filter((u) => ourKeys.some((k) =>
   k !== u.id && (u.id.startsWith(k) || k.startsWith(u.id.split('-')[0])) && u.id.split('-')[0] === k.split('-')[0]
-));
+))
+  /*
+   * A near miss is only worth a human's attention if there is something behind it. `sei-evm`
+   * and `sonic-svm` match the shape of the bug this looks for, and both have no pools and no
+   * TVL -- there is nothing to map and nothing being missed. They were reported every week
+   * regardless, which is how a report trains its reader to skim past it.
+   */
+  .filter((u) => u.nPools > 0 || u.tvl > 0);
 
 if (nearMiss.length) {
   needsAttention++;
@@ -153,7 +186,7 @@ if (nearMiss.length) {
   for (const m of nearMiss.slice(0, 8)) {
     const ours = ourKeys.find((k) => m.id.split('-')[0] === k.split('-')[0]);
     say(`- GeckoTerminal says \`${m.id}\`, we have \`${ours}\` — ${m.name}, ` +
-        `$${(m.tvl / 1e6).toFixed(0)}M`);
+        `$${(m.tvl / 1e6).toFixed(0)}M, ${m.nPools} pools in the yields data`);
   }
 }
 
@@ -163,14 +196,21 @@ if (bigUnmapped.length) {
   say('');
   say(`**${bigUnmapped.length} unmapped chains hold more than $50M:**`);
   say('');
-  say('| GeckoTerminal id | Chain | TVL |');
-  say('| --- | --- | ---: |');
+  say('| GeckoTerminal id | Chain | TVL | Name to map | Pools |');
+  say('| --- | --- | ---: | --- | ---: |');
   for (const u of bigUnmapped.slice(0, 15)) {
-    say(`| \`${u.id}\` | ${u.name} | $${(u.tvl / 1e6).toFixed(0)}M |`);
+    const nm = u.yieldsNames.length
+      ? u.yieldsNames.map((s) => '`' + s + '`').join(' + ')
+      : '_nothing under this name_';
+    say(`| \`${u.id}\` | ${u.name} | $${(u.tvl / 1e6).toFixed(0)}M | ${nm} | ${u.nPools} |`);
   }
   say('');
-  say('Adding one means putting its exact DefiLlama chain name in `CHAINS` in `js/llama.js`. ' +
-      'The name must match exactly — a near-miss returns zero pools silently.');
+  say('**Name to map** is the spelling taken from the yields dataset, which is what `CHAINS` ' +
+      'in `js/llama.js` is compared against — not the name DefiLlama displays for the chain. ' +
+      'They differ more often than you would guess, and a near-miss returns zero pools in ' +
+      'silence. Where two names are listed, map the key to an array of both: one chain is ' +
+      'sometimes filed under several. Where none is listed, the yields data has no pools under ' +
+      'that name, so mapping it now would add an entry that can only ever match nothing.');
 }
 say('');
 

@@ -209,6 +209,62 @@ suite('positions — a failed symbol lookup is not cached');
   check('a resolved symbol is cached', calls === after, calls + ' calls after ' + after);
 }
 
+/* ------------------------------------------- the other poisoned cache ----- */
+
+/*
+ * The pool-list cache had the same flaw the symbol cache had: it kept a partial result.
+ *
+ * The LP sweep has no index to consult, so it walks the busiest pools a page at a time. When a
+ * page was refused the loop broke and cached whatever it already had, which made one rate-limited
+ * request permanent for the session -- every later scan of that chain searched a third of the
+ * pools and said nothing about it. These two assert the rule the symbol cache already follows:
+ * a partial answer is reported and not remembered.
+ */
+suite('positions — a truncated pool list is not cached');
+{
+  let failPage2 = true;
+  const pageOf = (n) => ({
+    data: Array.from({ length: 20 }, (_, i) => ({
+      attributes: {
+        address: '0x' + String(n * 100 + i).padStart(40, '0'),
+        name: 'POOL' + n + '-' + i,
+        reserve_in_usd: '1000'
+      }
+    }))
+  });
+
+  const LP = loadLP(['util', 'fees', 'positions'], {
+    fetch: async (url, opts) => {
+      if (String(url).includes('geckoterminal')) {
+        const p = Number((String(url).match(/page=(\d+)/) || [])[1] || 1);
+        // The shape of a rate limit: a refusal on one page, mid-walk.
+        if (p === 2 && failPage2) return { ok: false, status: 429, json: async () => ({}) };
+        return { ok: true, status: 200, json: async () => pageOf(p) };
+      }
+      const calls = JSON.parse(opts.body);
+      return {
+        ok: true, status: 200,
+        json: async () => calls.map((c) => ({
+          jsonrpc: '2.0', id: c.id, result: '0x' + '0'.repeat(64)
+        }))
+      };
+    }
+  });
+
+  const first = await LP.positions.scan('base', OWNER);
+  check('a refused page is reported rather than silently shrinking the sweep',
+    /fewer pools/.test(JSON.stringify(first.errors)), JSON.stringify(first.errors));
+  check('and only the pools that were actually fetched count as checked',
+    first.lpChecked === 20, 'checked ' + first.lpChecked);
+
+  failPage2 = false;
+  const second = await LP.positions.scan('base', OWNER);
+  check('the truncated list was not cached, so a later scan gets the full set',
+    second.lpChecked === 60, 'checked ' + second.lpChecked);
+  check('and the later scan has nothing left to complain about',
+    !/fewer pools/.test(JSON.stringify(second.errors)), JSON.stringify(second.errors));
+}
+
 /* ------------------------------------------------------------------ chains */
 
 suite('positions — configuration');

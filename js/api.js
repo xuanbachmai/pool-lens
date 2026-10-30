@@ -13,7 +13,25 @@ LP.api = (function () {
   const cache = new Map();
   let chain = Promise.resolve(); // serialises requests so we don't burst the rate limit
 
-  /** GeckoTerminal's free tier allows ~30 calls/min; space calls out a little. */
+  /*
+   * Serialise, and don't pretend the spacing is doing more than it is.
+   *
+   * This used to claim the free tier allows about 30 calls a minute. Measured against the live
+   * endpoint, that is not the shape of the limit at all: from a rested start about three to five
+   * requests succeed and everything after that is rejected, and the spacing between them makes
+   * almost no difference -- 120ms apart and 1500ms apart both got five through and then stopped.
+   * A 200-second pause before trying again still only bought three. It behaves like a small
+   * bucket with a slow refill rather than a per-minute quota.
+   *
+   * So the delay below is not what keeps us inside the limit; only making fewer calls does.
+   * What the serialisation genuinely buys is that a page doing three things at once sends its
+   * requests one after another, which keeps a single slow analysis from spending the whole
+   * allowance in one parallel burst. The 120ms is kept for that ordering, not as a rate.
+   *
+   * Hence the caching above being the real defence, and why no retry loop was added: once the
+   * endpoint starts refusing, it kept refusing for well over a minute in every measurement, so
+   * retrying would spend the user's time without improving their odds.
+   */
   function queued(fn) {
     const run = chain.then(fn, fn);
     chain = run.then(() => new Promise((r) => setTimeout(r, 120)), () => new Promise((r) => setTimeout(r, 120)));
@@ -38,15 +56,18 @@ LP.api = (function () {
         const host = new URL(url).host;
         throw new RateLimitError(
           'The request to ' + host + ' was blocked before a response could be read. That is ' +
-          'almost always the free tier rate limit (about 30 requests per minute) — it drops ' +
-          'the CORS header on rejected requests, so the browser cannot see the 429. Wait a ' +
-          'moment and analyse again. If it persists, check your connection or an ad blocker.'
+          'almost always its rate limit: the free tier allows only a few requests before it ' +
+          'starts refusing, and it drops the CORS header on the ones it refuses, so the ' +
+          'browser cannot see the 429 and reports a network error instead. Give it a minute ' +
+          'and analyse again — it does not clear in a few seconds. If it persists, check your ' +
+          'connection or an ad blocker.'
         );
       }
       if (res.status === 429) {
         throw new RateLimitError(
-          'Rate limited by ' + new URL(url).host + '. The free tier allows about 30 requests ' +
-          'per minute — wait a moment and analyse again.'
+          'Rate limited by ' + new URL(url).host + '. The free tier allows only a few requests ' +
+          'before it starts refusing, and it takes a minute or more to let more through — ' +
+          'give it a moment and analyse again.'
         );
       }
       if (res.status === 404) return null;
